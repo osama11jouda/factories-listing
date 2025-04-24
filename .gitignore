@@ -1,0 +1,31 @@
+# Assets folder
+assests/
+uploads/
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE files
+.idea/
+.vscode/
+
+# Configuration files that might contain sensitive information
+includes/config.php
+
+# Logs and databases
+*.log
+*.sql
+*.sqlite
+
+# Cache files
+*.cache
+
+# Dependency directories
+vendor/
+node_modules/
