@@ -1,5 +1,6 @@
 <?php
 include 'includes/header.php';
+require_once 'models/ContactMessage.php';
 
 // Initialize variables
 $success = false;
@@ -14,10 +15,10 @@ if (isset($_GET['subject']) && !empty($_GET['subject'])) {
 // Process form submission
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
     // Get form data
-    $name = mysqli_real_escape_string($conn, $_POST['name']);
-    $email = mysqli_real_escape_string($conn, $_POST['email']);
-    $subject = mysqli_real_escape_string($conn, $_POST['subject']);
-    $message = mysqli_real_escape_string($conn, $_POST['message']);
+    $name = $_POST['name'];
+    $email = $_POST['email'];
+    $subject = $_POST['subject'];
+    $message = $_POST['message'];
     
     // Validate input
     if (empty($name) || empty($email) || empty($message)) {
@@ -25,16 +26,19 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
         $error = "Please enter a valid email address.";
     } else {
-        // Insert message into database
-        $query = "INSERT INTO contact_messages (name, email, subject, message, submission_date, is_read) 
-                  VALUES ('$name', '$email', '$subject', '$message', NOW(), 0)";
-                  
-        if (mysqli_query($conn, $query)) {
+        // Create a new message using the model
+        $contactMessage = new ContactMessage();
+        $contactMessage->setName($name);
+        $contactMessage->setEmail($email);
+        $contactMessage->setSubject($subject);
+        $contactMessage->setMessage($message);
+        
+        if ($contactMessage->create()) {
             $success = true;
             // Reset form after successful submission
             $name = $email = $subject = $message = '';
         } else {
-            $error = "Error: " . mysqli_error($conn);
+            $error = "Error: Unable to send message. Please try again later.";
         }
     }
 }

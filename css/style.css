@@ -470,10 +470,17 @@ section {
 }
 
 /* Login/Register Tabs */
-.auth-tabs .nav-link {
-  color: #495057;
+.nav-link.active {
+  color: #495057 !important;
+  border: #6c757d 1px solid;
 }
 
+.nav-link {
+  color: #118f1a;
+}
+.nav-link:hover {
+  color: #024307;
+}
 .auth-tabs .nav-link.active {
   font-weight: bold;
   color: #0fb64f;
@@ -953,12 +960,8 @@ section {
 
 .btn-login:hover {
   background-color: #fff;
-  color: #007bff;
+  color: #ffffff;
   border-color: #fff;
-}
-
-.btn-login:hover i {
-  color: #007bff;
 }
 
 .btn-register {
@@ -970,12 +973,8 @@ section {
 
 .btn-register:hover {
   background-color: #fff;
-  color: #28a745;
+  color: #f3f6f4;
   border-color: #fff;
-}
-
-.btn-register:hover i {
-  color: #28a745;
 }
 
 /* Subscription Steps */

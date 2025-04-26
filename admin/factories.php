@@ -1,4 +1,8 @@
-<?php include 'includes/header.php'; ?>
+<?php 
+include 'includes/header.php';
+require_once '../models/Factory.php';
+require_once '../models/FactoryImage.php';
+?>
 
 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
     <h1 class="h2">Factory Listings</h1>
@@ -16,36 +20,36 @@
 if(isset($_GET['delete']) && is_numeric($_GET['delete'])) {
     $factoryId = intval($_GET['delete']);
     
-    // First delete related images
-    $deleteImagesQuery = "DELETE FROM factory_images WHERE factory_id = $factoryId";
-    mysqli_query($conn, $deleteImagesQuery);
-    
-    // Then delete the factory
-    $deleteFactoryQuery = "DELETE FROM factories WHERE id = $factoryId";
-    if(mysqli_query($conn, $deleteFactoryQuery)) {
-        echo '<div class="alert alert-success alert-dismissible fade show" role="alert">
-                Factory successfully deleted.
-                <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-                    <span aria-hidden="true">&times;</span>
-                </button>
-            </div>';
-    } else {
-        echo '<div class="alert alert-danger alert-dismissible fade show" role="alert">
-                Error deleting factory: ' . mysqli_error($conn) . '
-                <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-                    <span aria-hidden="true">&times;</span>
-                </button>
-            </div>';
+    $factory = new Factory();
+    if ($factory->findById($factoryId)) {
+        if ($factory->delete()) {
+            echo '<div class="alert alert-success alert-dismissible fade show" role="alert">
+                    Factory successfully deleted.
+                    <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>';
+        } else {
+            echo '<div class="alert alert-danger alert-dismissible fade show" role="alert">
+                    Error deleting factory.
+                    <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>';
+        }
     }
 }
 
 // Feature/unfeature factory
 if(isset($_GET['feature']) && is_numeric($_GET['feature'])) {
     $factoryId = intval($_GET['feature']);
-    $featureValue = isset($_GET['value']) && $_GET['value'] == '1' ? 1 : 0;
+    $featureValue = isset($_GET['value']) && $_GET['value'] == '1' ? true : false;
     
-    $featureQuery = "UPDATE factories SET featured = $featureValue WHERE id = $factoryId";
-    mysqli_query($conn, $featureQuery);
+    $factory = new Factory();
+    if ($factory->findById($factoryId)) {
+        $factory->setFeatured($featureValue);
+        $factory->update();
+    }
 }
 
 // Pagination parameters
@@ -54,36 +58,27 @@ $itemsPerPage = 10;
 $offset = ($page - 1) * $itemsPerPage;
 
 // Search parameters
-$search = isset($_GET['search']) ? mysqli_real_escape_string($conn, $_GET['search']) : '';
-$typeFilter = isset($_GET['type']) ? mysqli_real_escape_string($conn, $_GET['type']) : '';
-$statusFilter = isset($_GET['status']) ? mysqli_real_escape_string($conn, $_GET['status']) : '';
+$search = isset($_GET['search']) ? $_GET['search'] : '';
+$typeFilter = isset($_GET['type']) ? $_GET['type'] : '';
+$statusFilter = isset($_GET['status']) ? $_GET['status'] : '';
 
-// Build the search condition
-$searchCondition = "";
-if(!empty($search)) {
-    $searchCondition .= " AND (title LIKE '%$search%' OR location LIKE '%$search%' OR description LIKE '%$search%')";
-}
-if(!empty($typeFilter)) {
-    $searchCondition .= " AND type = '$typeFilter'";
-}
-if(!empty($statusFilter)) {
-    $searchCondition .= " AND status = '$statusFilter'";
+// Build filters for the Factory model
+$filters = [];
+
+if (!empty($typeFilter)) {
+    $filters['type'] = $typeFilter;
 }
 
-// Get total number of factories with search condition
-$countQuery = "SELECT COUNT(*) as total FROM factories WHERE 1=1" . $searchCondition;
-$countResult = mysqli_query($conn, $countQuery);
-$totalItems = mysqli_fetch_assoc($countResult)['total'];
+if (!empty($statusFilter)) {
+    $filters['status'] = $statusFilter;
+}
+
+// Get total factories count with filters
+$totalItems = Factory::countAll($filters);
 $totalPages = ceil($totalItems / $itemsPerPage);
 
-// Get factories with search condition and pagination
-$query = "SELECT f.*, 
-          (SELECT image_path FROM factory_images WHERE factory_id = f.id AND is_main = 1 LIMIT 1) as main_image 
-          FROM factories f 
-          WHERE 1=1" . $searchCondition . " 
-          ORDER BY f.featured DESC, f.date_added DESC 
-          LIMIT $offset, $itemsPerPage";
-$result = mysqli_query($conn, $query);
+// Get factories using the model
+$factories = Factory::getAll($itemsPerPage, $offset, $filters);
 ?>
 
 <!-- Search Form -->
@@ -136,63 +131,64 @@ $result = mysqli_query($conn, $query);
                     </tr>
                 </thead>
                 <tbody>
-                    <?php 
-                    if(mysqli_num_rows($result) > 0): 
-                        while($factory = mysqli_fetch_assoc($result)):
-                    ?>
-                        <tr>
-                            <td width="80">
-                                <?php if(!empty($factory['main_image'])): ?>
-                                    <img src="../uploads/factories/<?php echo $factory['main_image']; ?>" class="img-thumbnail" alt="Factory Image" width="70">
-                                <?php else: ?>
-                                    <img src="../images/factory-placeholder.jpg" class="img-thumbnail" alt="Factory Placeholder" width="70">
-                                <?php endif; ?>
-                            </td>
-                            <td><?php echo $factory['title']; ?></td>
-                            <td><?php echo $factory['location']; ?></td>
-                            <td>
-                                <span class="badge badge-<?php echo $factory['type'] == 'sale' ? 'success' : 'info'; ?>">
-                                    <?php echo ucfirst($factory['type']); ?>
-                                </span>
-                            </td>
-                            <td>$<?php echo number_format($factory['price']); ?></td>
-                            <td>
-                                <span class="badge badge-<?php 
-                                    echo $factory['status'] == 'available' ? 'success' : 
-                                        ($factory['status'] == 'pending' ? 'warning' : 'secondary'); 
-                                ?>">
-                                    <?php echo ucfirst($factory['status']); ?>
-                                </span>
-                            </td>
-                            <td>
-                                <?php if($factory['featured']): ?>
-                                    <a href="factories.php?feature=<?php echo $factory['id']; ?>&value=0" class="text-warning" title="Click to unfeature">
-                                        <i class="fas fa-star"></i>
-                                    </a>
-                                <?php else: ?>
-                                    <a href="factories.php?feature=<?php echo $factory['id']; ?>&value=1" class="text-secondary" title="Click to feature">
-                                        <i class="far fa-star"></i>
-                                    </a>
-                                <?php endif; ?>
-                            </td>
-                            <td>
-                                <div class="btn-group btn-group-sm">
-                                    <a href="../factory-details.php?id=<?php echo $factory['id']; ?>" class="btn btn-info" title="View" target="_blank">
-                                        <i class="fas fa-eye"></i>
-                                    </a>
-                                    <a href="edit_factory.php?id=<?php echo $factory['id']; ?>" class="btn btn-primary" title="Edit">
-                                        <i class="fas fa-edit"></i>
-                                    </a>
-                                    <a href="factories.php?delete=<?php echo $factory['id']; ?>" class="btn btn-danger" title="Delete" onclick="return confirm('Are you sure you want to delete this factory?')">
-                                        <i class="fas fa-trash-alt"></i>
-                                    </a>
-                                </div>
-                            </td>
-                        </tr>
-                    <?php 
-                        endwhile;
-                    else: 
-                    ?>
+                    <?php if (!empty($factories)): ?>
+                        <?php foreach ($factories as $factory): ?>
+                            <?php 
+                                $mainImage = $factory->getMainImage();
+                                $address = $factory->getAddress();
+                                $location = $address ? $address->getCity() . ', ' . $address->getCountry() : 'N/A';
+                            ?>
+                            <tr>
+                                <td width="80">
+                                    <?php if ($mainImage): ?>
+                                        <img src="<?php echo $mainImage->getImagePath(); ?>" class="img-thumbnail" alt="Factory Image" width="70">
+                                    <?php else: ?>
+                                        <img src="../images/factory-placeholder.jpg" class="img-thumbnail" alt="Factory Placeholder" width="70">
+                                    <?php endif; ?>
+                                </td>
+                                <td><?php echo $factory->getTitle(); ?></td>
+                                <td><?php echo $location; ?></td>
+                                <td>
+                                    <span class="badge badge-<?php echo $factory->getType() == 'sale' ? 'success' : 'info'; ?>">
+                                        <?php echo ucfirst($factory->getType()); ?>
+                                    </span>
+                                </td>
+                                <td>$<?php echo number_format($factory->getPrice()); ?></td>
+                                <td>
+                                    <span class="badge badge-<?php 
+                                        echo $factory->getStatus() == 'available' ? 'success' : 
+                                            ($factory->getStatus() == 'pending' ? 'warning' : 'secondary'); 
+                                    ?>">
+                                        <?php echo ucfirst($factory->getStatus()); ?>
+                                    </span>
+                                </td>
+                                <td>
+                                    <?php if ($factory->isFeatured()): ?>
+                                        <a href="factories.php?feature=<?php echo $factory->getId(); ?>&value=0" class="text-warning" title="Click to unfeature">
+                                            <i class="fas fa-star"></i>
+                                        </a>
+                                    <?php else: ?>
+                                        <a href="factories.php?feature=<?php echo $factory->getId(); ?>&value=1" class="text-secondary" title="Click to feature">
+                                            <i class="far fa-star"></i>
+                                        </a>
+                                    <?php endif; ?>
+                                </td>
+                                <td>
+                                    <div class="btn-group btn-group-sm">
+                                        <a href="../factory-details.php?id=<?php echo $factory->getId(); ?>" class="btn btn-info" title="View" target="_blank">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                        <a href="edit_factory.php?id=<?php echo $factory->getId(); ?>" class="btn btn-primary" title="Edit">
+                                            <i class="fas fa-edit"></i>
+                                        </a>
+                                        <a href="factories.php?delete=<?php echo $factory->getId(); ?>" class="btn btn-danger" title="Delete" onclick="return confirm('Are you sure you want to delete this factory?')">
+                                            <i class="fas fa-trash-alt"></i>
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                    <?php else: ?>
                         <tr>
                             <td colspan="8" class="text-center">No factories found</td>
                         </tr>
@@ -204,7 +200,7 @@ $result = mysqli_query($conn, $query);
 </div>
 
 <!-- Pagination -->
-<?php if($totalPages > 1): ?>
+<?php if ($totalPages > 1): ?>
 <nav aria-label="Page navigation" class="mt-4">
     <ul class="pagination justify-content-center">
         <li class="page-item <?php echo $page <= 1 ? 'disabled' : ''; ?>">
@@ -213,7 +209,7 @@ $result = mysqli_query($conn, $query);
             </a>
         </li>
         
-        <?php for($i = 1; $i <= $totalPages; $i++): ?>
+        <?php for ($i = 1; $i <= $totalPages; $i++): ?>
             <li class="page-item <?php echo $page == $i ? 'active' : ''; ?>">
                 <a class="page-link" href="?page=<?php echo $i; ?>&search=<?php echo urlencode($search); ?>&type=<?php echo urlencode($typeFilter); ?>&status=<?php echo urlencode($statusFilter); ?>">
                     <?php echo $i; ?>

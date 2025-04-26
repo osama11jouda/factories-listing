@@ -259,7 +259,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['login'])) {
                             <div class="form-switch-text">
                                 <p>Already have an account? 
                                     <a href="#login-panel" data-toggle="pill" role="tab" aria-controls="login-panel" 
-                                       aria-selected="false" class="font-weight-bold text-primary toggle-form" data-target="login-tab">
+                                       aria-selected="false" class="font-weight-bold text-success toggle-form" data-target="login-tab">
                                        Login Here
                                     </a>
                                 </p>

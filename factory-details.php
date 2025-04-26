@@ -1,5 +1,8 @@
 <?php
 include 'includes/header.php';
+require_once 'models/Factory.php';
+require_once 'models/FactoryImage.php';
+require_once 'models/Address.php';
 
 // Check if user is logged in and active
 $loggedIn = isset($_SESSION['user_id']);
@@ -14,35 +17,15 @@ if ($factoryId <= 0) {
     exit;
 }
 
-// Get factory details
-$query = "SELECT * FROM factories WHERE id = $factoryId";
-$result = mysqli_query($conn, $query);
+// Get factory details using our model
+$factory = new Factory();
+$factoryExists = $factory->findById($factoryId);
 
-if (mysqli_num_rows($result) == 0) {
-    // Factory not found
-    $factoryExists = false;
-} else {
-    $factoryExists = true;
-    $factory = mysqli_fetch_assoc($result);
-    
-    // Get factory images
-    $imagesQuery = "SELECT * FROM factory_images WHERE factory_id = $factoryId ORDER BY is_main DESC";
-    $imagesResult = mysqli_query($conn, $imagesQuery);
-    
-    $images = [];
-    $mainImage = '';
-    
-    while ($image = mysqli_fetch_assoc($imagesResult)) {
-        $images[] = $image;
-        if ($image['is_main'] == 1) {
-            $mainImage = $image['image_path'];
-        }
-    }
-    
-    // If no main image is set, use the first one or a placeholder
-    if (empty($mainImage) && count($images) > 0) {
-        $mainImage = $images[0]['image_path'];
-    }
+// Get factory images if factory exists
+if ($factoryExists) {
+    $images = $factory->getImages();
+    $mainImage = $factory->getMainImage();
+    $address = $factory->getAddress();
 }
 ?>
 
@@ -73,7 +56,7 @@ if (mysqli_num_rows($result) == 0) {
                     <ol class="breadcrumb">
                         <li class="breadcrumb-item"><a href="index.php">Home</a></li>
                         <li class="breadcrumb-item"><a href="factories.php">Factories</a></li>
-                        <li class="breadcrumb-item active" aria-current="page"><?php echo $factory['title']; ?></li>
+                        <li class="breadcrumb-item active" aria-current="page"><?php echo $factory->getTitle(); ?></li>
                     </ol>
                 </nav>
             </div>
@@ -82,17 +65,18 @@ if (mysqli_num_rows($result) == 0) {
         <div class="row">
             <!-- Factory Images Gallery -->
             <div class="col-lg-7 mb-4">
-                <?php if (count($images) > 0): ?>
+                <?php if (!empty($images)): ?>
                     <div class="factory-gallery">
                         <div class="main-image-container mb-3">
-                            <img src="uploads/factories/<?php echo $mainImage; ?>" class="img-fluid main-image" id="mainImage" alt="<?php echo $factory['title']; ?>">
-                            <?php if ($factory['featured']): ?>
+                            <img src="<?php echo $mainImage ? $mainImage->getImagePath() : 'images/factory-placeholder.jpg'; ?>" 
+                                 class="img-fluid main-image" id="mainImage" alt="<?php echo $factory->getTitle(); ?>">
+                            <?php if ($factory->isFeatured()): ?>
                                 <div class="featured-badge-details">
                                     <span><i class="fas fa-star"></i> Featured</span>
                                 </div>
                             <?php endif; ?>
-                            <span class="property-type-badge-details <?php echo $factory['type'] == 'sale' ? 'sale' : 'rent'; ?>">
-                                For <?php echo ucfirst($factory['type']); ?>
+                            <span class="property-type-badge-details <?php echo $factory->getType() == 'sale' ? 'sale' : 'rent'; ?>">
+                                For <?php echo ucfirst($factory->getType()); ?>
                             </span>
                         </div>
                         
@@ -100,10 +84,10 @@ if (mysqli_num_rows($result) == 0) {
                             <div class="thumbnail-gallery row">
                                 <?php foreach ($images as $index => $image): ?>
                                     <div class="col-3 mb-3">
-                                        <img src="uploads/factories/<?php echo $image['image_path']; ?>" 
-                                             class="img-thumbnail gallery-thumbnail <?php echo ($image['is_main'] == 1) ? 'active' : ''; ?>" 
-                                             onclick="changeMainImage('<?php echo $image['image_path']; ?>', this)" 
-                                             alt="<?php echo $factory['title'] . ' - Image ' . ($index + 1); ?>">
+                                        <img src="<?php echo $image->getImagePath(); ?>" 
+                                             class="img-thumbnail gallery-thumbnail <?php echo ($image->isMain()) ? 'active' : ''; ?>" 
+                                             onclick="changeMainImage('<?php echo $image->getImagePath(); ?>', this)" 
+                                             alt="<?php echo $factory->getTitle() . ' - Image ' . ($index + 1); ?>">
                                     </div>
                                 <?php endforeach; ?>
                             </div>
@@ -118,40 +102,43 @@ if (mysqli_num_rows($result) == 0) {
             <div class="col-lg-5">
                 <div class="card">
                     <div class="card-body">
-                        <h2 class="factory-title mb-3"><?php echo $factory['title']; ?></h2>
+                        <h2 class="factory-title mb-3"><?php echo $factory->getTitle(); ?></h2>
                         
                         <div class="factory-price mb-3">
                             <span class="price-label">Price:</span>
-                            <span class="price-amount">$<?php echo number_format($factory['price']); ?></span>
-                            <?php if ($factory['type'] == 'rent'): ?>
+                            <span class="price-amount">$<?php echo number_format($factory->getPrice()); ?></span>
+                            <?php if ($factory->getType() == 'rent'): ?>
                                 <span class="price-period">/ month</span>
                             <?php endif; ?>
                         </div>
                         
                         <ul class="factory-details-list">
+                            <?php if ($address): ?>
                             <li>
                                 <i class="fas fa-map-marker-alt"></i>
-                                <strong>Location:</strong> <?php echo $factory['location']; ?>
+                                <strong>Location:</strong> <?php echo $address->getCity() . ', ' . $address->getCountry(); ?>
                             </li>
+                            <?php endif; ?>
                             <li>
                                 <i class="fas fa-ruler-combined"></i>
-                                <strong>Total Area:</strong> <?php echo number_format($factory['area']); ?> sq m
+                                <strong>Total Area:</strong> <?php echo number_format($factory->getArea()); ?> sq m
                             </li>
                             <li>
                                 <i class="fas fa-tag"></i>
                                 <strong>Status:</strong> 
-                                <span class="badge badge-success">Available</span>
+                                <span class="badge badge-success"><?php echo ucfirst($factory->getStatus()); ?></span>
                             </li>
                             <li>
                                 <i class="fas fa-calendar-alt"></i>
-                                <strong>Listed:</strong> <?php echo date('F d, Y', strtotime($factory['date_added'])); ?>
+                                <strong>Listed:</strong> <?php echo date('F d, Y', strtotime($factory->getDateAdded())); ?>
                             </li>
                         </ul>
                         
                         <div class="factory-contact mt-4">
                             <h5 class="mb-3"><i class="fas fa-phone"></i> Contact Information</h5>
-                            <?php if (!empty($factory['contact_info'])): ?>
-                                <p><?php echo nl2br($factory['contact_info']); ?></p>
+                            <?php $contactInfo = $factory->getContactInfo(); ?>
+                            <?php if (!empty($contactInfo)): ?>
+                                <p><?php echo nl2br($contactInfo); ?></p>
                             <?php else: ?>
                                 <p>
                                     For more information about this factory, please contact our office:
@@ -164,7 +151,7 @@ if (mysqli_num_rows($result) == 0) {
                         </div>
                         
                         <div class="factory-actions mt-4">
-                            <a href="contact.php?subject=Inquiry about Factory: <?php echo urlencode($factory['title']); ?>" class="btn btn-primary btn-lg btn-block">
+                            <a href="contact.php?subject=Inquiry about Factory: <?php echo urlencode($factory->getTitle()); ?>" class="btn btn-primary btn-lg btn-block">
                                 <i class="fas fa-envelope"></i> Send Inquiry
                             </a>
                             <a href="#" class="btn btn-outline-secondary btn-block" onclick="window.print(); return false;">
@@ -185,7 +172,7 @@ if (mysqli_num_rows($result) == 0) {
                     </div>
                     <div class="card-body">
                         <div class="factory-description">
-                            <?php echo nl2br($factory['description']); ?>
+                            <?php echo nl2br($factory->getDescription()); ?>
                         </div>
                     </div>
                 </div>
@@ -194,54 +181,64 @@ if (mysqli_num_rows($result) == 0) {
         
         <!-- Related Factories -->
         <?php
-        // Get related factories (same location or type)
-        $relatedQuery = "SELECT f.id, f.title, f.location, f.price, f.type, f.area, 
-                        (SELECT image_path FROM factory_images WHERE factory_id = f.id AND is_main = 1 LIMIT 1) as main_image 
-                        FROM factories f 
-                        WHERE (f.location = '{$factory['location']}' OR f.type = '{$factory['type']}') 
-                        AND f.id != $factoryId AND f.status = 'available'
-                        ORDER BY f.featured DESC, RAND()
-                        LIMIT 3";
-        $relatedResult = mysqli_query($conn, $relatedQuery);
+        // Get related factories (same type)
+        $filters = [];
+        if ($address) {
+            $filters['city'] = $address->getCity();
+        }
+        $filters['type'] = $factory->getType();
+        $filters['status'] = 'available';
         
-        if (mysqli_num_rows($relatedResult) > 0):
+        // Get factories using the model
+        $relatedFactories = Factory::getAll(3, 0, $filters);
+        
+        // Filter out the current factory
+        $relatedFactories = array_filter($relatedFactories, function($relatedFactory) use ($factoryId) {
+            return $relatedFactory->getId() != $factoryId;
+        });
+        
+        if (!empty($relatedFactories)):
         ?>
         <div class="row mt-5">
             <div class="col-12">
                 <h3 class="section-title mb-4">Related Factories</h3>
             </div>
             
-            <?php while ($related = mysqli_fetch_assoc($relatedResult)): ?>
+            <?php foreach ($relatedFactories as $related): ?>
+            <?php $relatedMainImage = $related->getMainImage(); ?>
             <div class="col-md-4 mb-4">
                 <div class="card factory-card h-100">
                     <div class="card-img-top-wrapper">
-                        <?php if (!empty($related['main_image'])): ?>
-                            <img src="uploads/factories/<?php echo $related['main_image']; ?>" class="card-img-top" alt="<?php echo $related['title']; ?>">
+                        <?php if ($relatedMainImage): ?>
+                            <img src="<?php echo $relatedMainImage->getImagePath(); ?>" class="card-img-top" alt="<?php echo $related->getTitle(); ?>">
                         <?php else: ?>
                             <img src="images/factory-placeholder.jpg" class="card-img-top" alt="Factory Placeholder">
                         <?php endif; ?>
-                        <span class="property-type-badge <?php echo $related['type'] == 'sale' ? 'sale' : 'rent'; ?>">
-                            For <?php echo ucfirst($related['type']); ?>
+                        <span class="property-type-badge <?php echo $related->getType() == 'sale' ? 'sale' : 'rent'; ?>">
+                            For <?php echo ucfirst($related->getType()); ?>
                         </span>
                     </div>
                     <div class="card-body">
-                        <h5 class="card-title"><?php echo $related['title']; ?></h5>
+                        <h5 class="card-title"><?php echo $related->getTitle(); ?></h5>
+                        <?php $relatedAddress = $related->getAddress(); ?>
+                        <?php if ($relatedAddress): ?>
                         <p class="card-text location">
-                            <i class="fas fa-map-marker-alt"></i> <?php echo $related['location']; ?>
+                            <i class="fas fa-map-marker-alt"></i> <?php echo $relatedAddress->getCity() . ', ' . $relatedAddress->getCountry(); ?>
                         </p>
+                        <?php endif; ?>
                         <p class="card-text area">
-                            <i class="fas fa-ruler-combined"></i> <?php echo number_format($related['area']); ?> sq m
+                            <i class="fas fa-ruler-combined"></i> <?php echo number_format($related->getArea()); ?> sq m
                         </p>
                         <div class="d-flex justify-content-between align-items-center">
-                            <h6 class="price mb-0">$<?php echo number_format($related['price']); ?></h6>
-                            <a href="factory-details.php?id=<?php echo $related['id']; ?>" class="btn btn-primary">
+                            <h6 class="price mb-0">$<?php echo number_format($related->getPrice()); ?></h6>
+                            <a href="factory-details.php?id=<?php echo $related->getId(); ?>" class="btn btn-primary">
                                 View Details
                             </a>
                         </div>
                     </div>
                 </div>
             </div>
-            <?php endwhile; ?>
+            <?php endforeach; ?>
         </div>
         <?php endif; ?>
     <?php endif; ?>
@@ -358,7 +355,7 @@ if (mysqli_num_rows($result) == 0) {
 <script>
 function changeMainImage(imagePath, thumbnail) {
     // Update main image
-    document.getElementById('mainImage').src = 'uploads/factories/' + imagePath;
+    document.getElementById('mainImage').src = imagePath;
     
     // Update active thumbnail
     let thumbnails = document.querySelectorAll('.gallery-thumbnail');

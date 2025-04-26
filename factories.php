@@ -1,5 +1,8 @@
 <?php
 include 'includes/header.php';
+require_once 'models/Factory.php';
+require_once 'models/FactoryImage.php';
+require_once 'models/Address.php';
 
 // Check if user is logged in and active
 $loggedIn = isset($_SESSION['user_id']);
@@ -11,42 +14,45 @@ $itemsPerPage = 9;
 $offset = ($page - 1) * $itemsPerPage;
 
 // Search parameters
-$search = isset($_GET['search']) ? mysqli_real_escape_string($conn, $_GET['search']) : '';
-$typeFilter = isset($_GET['type']) ? mysqli_real_escape_string($conn, $_GET['type']) : '';
-$locationFilter = isset($_GET['location']) ? mysqli_real_escape_string($conn, $_GET['location']) : '';
-$minPrice = isset($_GET['min_price']) ? floatval($_GET['min_price']) : '';
-$maxPrice = isset($_GET['max_price']) ? floatval($_GET['max_price']) : '';
+$search = isset($_GET['search']) ? $_GET['search'] : '';
+$typeFilter = isset($_GET['type']) ? $_GET['type'] : '';
+$locationFilter = isset($_GET['location']) ? $_GET['location'] : '';
+$minPrice = isset($_GET['min_price']) && $_GET['min_price'] !== '' ? floatval($_GET['min_price']) : null;
+$maxPrice = isset($_GET['max_price']) && $_GET['max_price'] !== '' ? floatval($_GET['max_price']) : null;
 
-// Build the search condition
-$searchCondition = "WHERE status = 'available'";
-if (!empty($search)) {
-    $searchCondition .= " AND (title LIKE '%$search%' OR description LIKE '%$search%' OR location LIKE '%$search%')";
-}
+// Build filters for the Factory model
+$filters = [
+    'status' => 'available'
+];
+
 if (!empty($typeFilter)) {
-    $searchCondition .= " AND type = '$typeFilter'";
-}
-if (!empty($locationFilter)) {
-    $searchCondition .= " AND location LIKE '%$locationFilter%'";
-}
-if ($minPrice !== '') {
-    $searchCondition .= " AND price >= $minPrice";
-}
-if ($maxPrice !== '') {
-    $searchCondition .= " AND price <= $maxPrice";
+    $filters['type'] = $typeFilter;
 }
 
-// Get total number of factories with search condition
-$countQuery = "SELECT COUNT(*) as total FROM factories $searchCondition";
-$countResult = mysqli_query($conn, $countQuery);
-$totalItems = mysqli_fetch_assoc($countResult)['total'];
+if ($minPrice !== null) {
+    $filters['min_price'] = $minPrice;
+}
+
+if ($maxPrice !== null) {
+    $filters['max_price'] = $maxPrice;
+}
+
+// Get total factories count with filters
+$totalItems = Factory::countAll($filters);
 $totalPages = ceil($totalItems / $itemsPerPage);
 
+// Get factories using the model
+$factories = Factory::getAll($itemsPerPage, $offset, $filters);
+
 // Get unique locations for filter dropdown
-$locationsQuery = "SELECT DISTINCT location FROM factories ORDER BY location";
-$locationsResult = mysqli_query($conn, $locationsQuery);
+$db = Database::getInstance();
+$locationsQuery = "SELECT DISTINCT a.city FROM addresses a 
+                   JOIN factories f ON f.address_id = a.id
+                   ORDER BY a.city";
+$locationsResult = $db->query($locationsQuery);
 $locations = [];
-while ($row = mysqli_fetch_assoc($locationsResult)) {
-    $locations[] = $row['location'];
+while ($row = $db->fetchArray($locationsResult)) {
+    $locations[] = $row['city'];
 }
 ?>
 
@@ -92,10 +98,10 @@ while ($row = mysqli_fetch_assoc($locationsResult)) {
                             </select>
                         </div>
                         <div class="col-md-2 mb-3">
-                            <input type="number" class="form-control" name="min_price" placeholder="Min Price" value="<?php echo $minPrice !== '' ? $minPrice : ''; ?>">
+                            <input type="number" class="form-control" name="min_price" placeholder="Min Price" value="<?php echo $minPrice !== null ? $minPrice : ''; ?>">
                         </div>
                         <div class="col-md-2 mb-3">
-                            <input type="number" class="form-control" name="max_price" placeholder="Max Price" value="<?php echo $maxPrice !== '' ? $maxPrice : ''; ?>">
+                            <input type="number" class="form-control" name="max_price" placeholder="Max Price" value="<?php echo $maxPrice !== null ? $maxPrice : ''; ?>">
                         </div>
                     </div>
                     <div class="row">
@@ -116,57 +122,51 @@ while ($row = mysqli_fetch_assoc($locationsResult)) {
         
         <!-- Factories List -->
         <div class="row">
-            <?php
-            // Get factories with search condition
-            $query = "SELECT f.*, 
-                      (SELECT image_path FROM factory_images WHERE factory_id = f.id AND is_main = 1 LIMIT 1) as main_image 
-                      FROM factories f 
-                      $searchCondition 
-                      ORDER BY f.featured DESC, f.date_added DESC 
-                      LIMIT $offset, $itemsPerPage";
-            $result = mysqli_query($conn, $query);
-            
-            if (mysqli_num_rows($result) > 0):
-                while ($factory = mysqli_fetch_assoc($result)):
-            ?>
-                <div class="col-lg-4 col-md-6 mb-4">
-                    <div class="card factory-card h-100">
-                        <?php if ($factory['featured']): ?>
-                            <div class="featured-badge">
-                                <span><i class="fas fa-star"></i> Featured</span>
-                            </div>
-                        <?php endif; ?>
-                        <div class="card-img-top-wrapper">
-                            <?php if (!empty($factory['main_image'])): ?>
-                                <img src="uploads/factories/<?php echo $factory['main_image']; ?>" class="card-img-top" alt="<?php echo $factory['title']; ?>">
-                            <?php else: ?>
-                                <img src="images/factory-placeholder.jpg" class="card-img-top" alt="Factory Placeholder">
+            <?php if (!empty($factories)): ?>
+                <?php foreach ($factories as $factory): ?>
+                    <?php 
+                        $mainImage = $factory->getMainImage();
+                        $address = $factory->getAddress();
+                    ?>
+                    <div class="col-lg-4 col-md-6 mb-4">
+                        <div class="card factory-card h-100">
+                            <?php if ($factory->isFeatured()): ?>
+                                <div class="featured-badge">
+                                    <span><i class="fas fa-star"></i> Featured</span>
+                                </div>
                             <?php endif; ?>
-                            <span class="property-type-badge <?php echo $factory['type'] == 'sale' ? 'sale' : 'rent'; ?>">
-                                For <?php echo ucfirst($factory['type']); ?>
-                            </span>
-                        </div>
-                        <div class="card-body">
-                            <h5 class="card-title"><?php echo $factory['title']; ?></h5>
-                            <p class="card-text location">
-                                <i class="fas fa-map-marker-alt"></i> <?php echo $factory['location']; ?>
-                            </p>
-                            <p class="card-text area">
-                                <i class="fas fa-ruler-combined"></i> <?php echo number_format($factory['area']); ?> sq m
-                            </p>
-                            <div class="d-flex justify-content-between align-items-center">
-                                <h6 class="price mb-0">$<?php echo number_format($factory['price']); ?></h6>
-                                <a href="factory-details.php?id=<?php echo $factory['id']; ?>" class="btn btn-primary">
-                                    View Details
-                                </a>
+                            <div class="card-img-top-wrapper">
+                                <?php if ($mainImage): ?>
+                                    <img src="<?php echo $mainImage->getImagePath(); ?>" class="card-img-top" alt="<?php echo $factory->getTitle(); ?>">
+                                <?php else: ?>
+                                    <img src="images/factory-placeholder.jpg" class="card-img-top" alt="Factory Placeholder">
+                                <?php endif; ?>
+                                <span class="property-type-badge <?php echo $factory->getType() == 'sale' ? 'sale' : 'rent'; ?>">
+                                    For <?php echo ucfirst($factory->getType()); ?>
+                                </span>
+                            </div>
+                            <div class="card-body">
+                                <h5 class="card-title"><?php echo $factory->getTitle(); ?></h5>
+                                <?php if ($address): ?>
+                                    <p class="card-text location">
+                                        <i class="fas fa-map-marker-alt"></i> 
+                                        <?php echo $address->getCity() . ', ' . $address->getCountry(); ?>
+                                    </p>
+                                <?php endif; ?>
+                                <p class="card-text area">
+                                    <i class="fas fa-ruler-combined"></i> <?php echo number_format($factory->getArea()); ?> sq m
+                                </p>
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <h6 class="price mb-0">$<?php echo number_format($factory->getPrice()); ?></h6>
+                                    <a href="factory-details.php?id=<?php echo $factory->getId(); ?>" class="btn btn-primary">
+                                        View Details
+                                    </a>
+                                </div>
                             </div>
                         </div>
                     </div>
-                </div>
-            <?php
-                endwhile;
-            else:
-            ?>
+                <?php endforeach; ?>
+            <?php else: ?>
                 <div class="col-12">
                     <div class="alert alert-secondary">
                         <i class="fas fa-info-circle"></i> No factories found matching your criteria.

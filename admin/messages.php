@@ -1,4 +1,7 @@
-<?php include 'includes/header.php'; ?>
+<?php 
+include 'includes/header.php';
+require_once '../models/ContactMessage.php'; 
+?>
 
 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
     <h1 class="h2">Contact Messages</h1>
@@ -8,23 +11,26 @@
 // Handle message marking as read/unread
 if (isset($_GET['read']) && is_numeric($_GET['read'])) {
     $messageId = intval($_GET['read']);
-    $value = isset($_GET['value']) && $_GET['value'] == '1' ? 1 : 0;
+    $value = isset($_GET['value']) && $_GET['value'] == '1' ? true : false;
     
-    $query = "UPDATE contact_messages SET is_read = $value WHERE id = $messageId";
-    if (mysqli_query($conn, $query)) {
-        echo '<div class="alert alert-success alert-dismissible fade show" role="alert">
-                Message status updated successfully.
-                <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-                    <span aria-hidden="true">&times;</span>
-                </button>
-            </div>';
-    } else {
-        echo '<div class="alert alert-danger alert-dismissible fade show" role="alert">
-                Error updating message status: ' . mysqli_error($conn) . '
-                <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-                    <span aria-hidden="true">&times;</span>
-                </button>
-            </div>';
+    $message = new ContactMessage();
+    if ($message->findById($messageId)) {
+        $message->setIsRead($value);
+        if ($message->markAsRead()) {
+            echo '<div class="alert alert-success alert-dismissible fade show" role="alert">
+                    Message status updated successfully.
+                    <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>';
+        } else {
+            echo '<div class="alert alert-danger alert-dismissible fade show" role="alert">
+                    Error updating message status.
+                    <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>';
+        }
     }
 }
 
@@ -32,21 +38,23 @@ if (isset($_GET['read']) && is_numeric($_GET['read'])) {
 if (isset($_GET['delete']) && is_numeric($_GET['delete'])) {
     $messageId = intval($_GET['delete']);
     
-    $query = "DELETE FROM contact_messages WHERE id = $messageId";
-    if (mysqli_query($conn, $query)) {
-        echo '<div class="alert alert-success alert-dismissible fade show" role="alert">
-                Message deleted successfully.
-                <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-                    <span aria-hidden="true">&times;</span>
-                </button>
-            </div>';
-    } else {
-        echo '<div class="alert alert-danger alert-dismissible fade show" role="alert">
-                Error deleting message: ' . mysqli_error($conn) . '
-                <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-                    <span aria-hidden="true">&times;</span>
-                </button>
-            </div>';
+    $message = new ContactMessage();
+    if ($message->findById($messageId)) {
+        if ($message->delete()) {
+            echo '<div class="alert alert-success alert-dismissible fade show" role="alert">
+                    Message deleted successfully.
+                    <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>';
+        } else {
+            echo '<div class="alert alert-danger alert-dismissible fade show" role="alert">
+                    Error deleting message.
+                    <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>';
+        }
     }
 }
 
@@ -56,32 +64,36 @@ $itemsPerPage = 10;
 $offset = ($page - 1) * $itemsPerPage;
 
 // Search parameters
-$search = isset($_GET['search']) ? mysqli_real_escape_string($conn, $_GET['search']) : '';
-$readFilter = isset($_GET['read_status']) ? mysqli_real_escape_string($conn, $_GET['read_status']) : '';
+$search = isset($_GET['search']) ? $_GET['search'] : '';
+$readFilter = isset($_GET['read_status']) ? $_GET['read_status'] : '';
 
-// Build the search condition
-$searchCondition = "WHERE 1=1";
-if (!empty($search)) {
-    $searchCondition .= " AND (name LIKE '%$search%' OR email LIKE '%$search%' OR subject LIKE '%$search%' OR message LIKE '%$search%')";
-}
-if ($readFilter !== '') {
-    $searchCondition .= " AND is_read = " . intval($readFilter);
+// Get messages using the model
+$onlyUnread = ($readFilter === '0');
+$onlyRead = ($readFilter === '1');
+
+// Call our model methods accordingly
+if ($onlyUnread) {
+    $messages = ContactMessage::getAll($itemsPerPage, $offset, true);
+    $totalItems = ContactMessage::countAll(true);
+} elseif ($onlyRead) {
+    // For read messages, we need to get all but filter in PHP
+    $allMessages = ContactMessage::getAll(null, 0, false);
+    $readMessages = array_filter($allMessages, function($msg) {
+        return $msg->isRead();
+    });
+    
+    // Manual pagination for read messages
+    $totalItems = count($readMessages);
+    $messages = array_slice($readMessages, $offset, $itemsPerPage);
+} else {
+    $messages = ContactMessage::getAll($itemsPerPage, $offset);
+    $totalItems = ContactMessage::countAll();
 }
 
-// Get total number of messages with search condition
-$countQuery = "SELECT COUNT(*) as total FROM contact_messages $searchCondition";
-$countResult = mysqli_query($conn, $countQuery);
-$totalItems = mysqli_fetch_assoc($countResult)['total'];
 $totalPages = ceil($totalItems / $itemsPerPage);
 
-// Get messages with search condition and pagination
-$query = "SELECT * FROM contact_messages $searchCondition ORDER BY submission_date DESC LIMIT $offset, $itemsPerPage";
-$result = mysqli_query($conn, $query);
-
 // Count unread messages
-$unreadQuery = "SELECT COUNT(*) as unread FROM contact_messages WHERE is_read = 0";
-$unreadResult = mysqli_query($conn, $unreadQuery);
-$unreadCount = mysqli_fetch_assoc($unreadResult)['unread'];
+$unreadCount = ContactMessage::countAll(true);
 ?>
 
 <!-- Search Form -->
@@ -138,46 +150,46 @@ $unreadCount = mysqli_fetch_assoc($unreadResult)['unread'];
                 </thead>
                 <tbody>
                     <?php 
-                    if (mysqli_num_rows($result) > 0): 
-                        while ($message = mysqli_fetch_assoc($result)):
-                            $rowClass = $message['is_read'] ? '' : 'table-active font-weight-bold';
+                    if (!empty($messages)): 
+                        foreach ($messages as $message):
+                            $rowClass = $message->isRead() ? '' : 'table-active font-weight-bold';
                     ?>
                         <tr class="<?php echo $rowClass; ?>">
                             <td>
-                                <?php if ($message['is_read']): ?>
+                                <?php if ($message->isRead()): ?>
                                     <i class="fas fa-envelope-open text-secondary"></i>
                                 <?php else: ?>
                                     <i class="fas fa-envelope text-primary"></i>
                                 <?php endif; ?>
                             </td>
-                            <td><?php echo date('M d, Y', strtotime($message['submission_date'])); ?></td>
-                            <td><?php echo htmlspecialchars($message['name']); ?></td>
-                            <td><a href="mailto:<?php echo htmlspecialchars($message['email']); ?>"><?php echo htmlspecialchars($message['email']); ?></a></td>
-                            <td><?php echo htmlspecialchars($message['subject'] ?: 'No Subject'); ?></td>
+                            <td><?php echo date('M d, Y', strtotime($message->getSubmissionDate())); ?></td>
+                            <td><?php echo htmlspecialchars($message->getName()); ?></td>
+                            <td><a href="mailto:<?php echo htmlspecialchars($message->getEmail()); ?>"><?php echo htmlspecialchars($message->getEmail()); ?></a></td>
+                            <td><?php echo htmlspecialchars($message->getSubject() ?: 'No Subject'); ?></td>
                             <td>
                                 <div class="btn-group btn-group-sm">
-                                    <button type="button" class="btn btn-info" data-toggle="modal" data-target="#viewModal<?php echo $message['id']; ?>">
+                                    <button type="button" class="btn btn-info" data-toggle="modal" data-target="#viewModal<?php echo $message->getId(); ?>">
                                         <i class="fas fa-eye"></i>
                                     </button>
-                                    <?php if ($message['is_read']): ?>
-                                        <a href="messages.php?read=<?php echo $message['id']; ?>&value=0" class="btn btn-secondary" title="Mark as Unread">
+                                    <?php if ($message->isRead()): ?>
+                                        <a href="messages.php?read=<?php echo $message->getId(); ?>&value=0" class="btn btn-secondary" title="Mark as Unread">
                                             <i class="fas fa-envelope"></i>
                                         </a>
                                     <?php else: ?>
-                                        <a href="messages.php?read=<?php echo $message['id']; ?>&value=1" class="btn btn-success" title="Mark as Read">
+                                        <a href="messages.php?read=<?php echo $message->getId(); ?>&value=1" class="btn btn-success" title="Mark as Read">
                                             <i class="fas fa-check"></i>
                                         </a>
                                     <?php endif; ?>
-                                    <a href="mailto:<?php echo htmlspecialchars($message['email']); ?>" class="btn btn-primary" title="Reply">
+                                    <a href="mailto:<?php echo htmlspecialchars($message->getEmail()); ?>" class="btn btn-primary" title="Reply">
                                         <i class="fas fa-reply"></i>
                                     </a>
-                                    <a href="messages.php?delete=<?php echo $message['id']; ?>" class="btn btn-danger" title="Delete" onclick="return confirm('Are you sure you want to delete this message?')">
+                                    <a href="messages.php?delete=<?php echo $message->getId(); ?>" class="btn btn-danger" title="Delete" onclick="return confirm('Are you sure you want to delete this message?')">
                                         <i class="fas fa-trash-alt"></i>
                                     </a>
                                 </div>
                                 
                                 <!-- View Message Modal -->
-                                <div class="modal fade" id="viewModal<?php echo $message['id']; ?>" tabindex="-1" aria-labelledby="viewModalLabel" aria-hidden="true">
+                                <div class="modal fade" id="viewModal<?php echo $message->getId(); ?>" tabindex="-1" aria-labelledby="viewModalLabel" aria-hidden="true">
                                     <div class="modal-dialog">
                                         <div class="modal-content">
                                             <div class="modal-header">
@@ -189,23 +201,23 @@ $unreadCount = mysqli_fetch_assoc($unreadResult)['unread'];
                                             <div class="modal-body">
                                                 <div class="card mb-3">
                                                     <div class="card-body">
-                                                        <h6 class="card-subtitle mb-2 text-muted">From: <?php echo htmlspecialchars($message['name']); ?> (<?php echo htmlspecialchars($message['email']); ?>)</h6>
-                                                        <h6 class="card-subtitle mb-2 text-muted">Date: <?php echo date('F d, Y H:i', strtotime($message['submission_date'])); ?></h6>
-                                                        <h5 class="card-title"><?php echo htmlspecialchars($message['subject'] ?: 'No Subject'); ?></h5>
-                                                        <p class="card-text"><?php echo nl2br(htmlspecialchars($message['message'])); ?></p>
+                                                        <h6 class="card-subtitle mb-2 text-muted">From: <?php echo htmlspecialchars($message->getName()); ?> (<?php echo htmlspecialchars($message->getEmail()); ?>)</h6>
+                                                        <h6 class="card-subtitle mb-2 text-muted">Date: <?php echo date('F d, Y H:i', strtotime($message->getSubmissionDate())); ?></h6>
+                                                        <h5 class="card-title"><?php echo htmlspecialchars($message->getSubject() ?: 'No Subject'); ?></h5>
+                                                        <p class="card-text"><?php echo nl2br(htmlspecialchars($message->getMessage())); ?></p>
                                                     </div>
                                                 </div>
                                                 
                                                 <?php
                                                 // Mark as read when viewed
-                                                if (!$message['is_read']) {
-                                                    $readQuery = "UPDATE contact_messages SET is_read = 1 WHERE id = " . $message['id'];
-                                                    mysqli_query($conn, $readQuery);
+                                                if (!$message->isRead()) {
+                                                    $message->setIsRead(true);
+                                                    $message->markAsRead();
                                                 }
                                                 ?>
                                             </div>
                                             <div class="modal-footer">
-                                                <a href="mailto:<?php echo htmlspecialchars($message['email']); ?>" class="btn btn-primary">
+                                                <a href="mailto:<?php echo htmlspecialchars($message->getEmail()); ?>" class="btn btn-primary">
                                                     <i class="fas fa-reply"></i> Reply by Email
                                                 </a>
                                                 <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
@@ -216,7 +228,7 @@ $unreadCount = mysqli_fetch_assoc($unreadResult)['unread'];
                             </td>
                         </tr>
                     <?php 
-                        endwhile;
+                        endforeach;
                     else: 
                     ?>
                         <tr>
