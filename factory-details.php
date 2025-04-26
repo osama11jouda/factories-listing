@@ -68,7 +68,7 @@ if ($factoryExists) {
                 <?php if (!empty($images)): ?>
                     <div class="factory-gallery">
                         <div class="main-image-container mb-3">
-                            <img src="<?php echo $mainImage ? $mainImage->getImagePath() : 'images/factory-placeholder.jpg'; ?>" 
+                            <img src="<?php echo $mainImage ? $mainImage->getFullImagePath() : 'images/factory-placeholder.jpg'; ?>" 
                                  class="img-fluid main-image" id="mainImage" alt="<?php echo $factory->getTitle(); ?>">
                             <?php if ($factory->isFeatured()): ?>
                                 <div class="featured-badge-details">
@@ -81,15 +81,25 @@ if ($factoryExists) {
                         </div>
                         
                         <?php if (count($images) > 1): ?>
-                            <div class="thumbnail-gallery row">
-                                <?php foreach ($images as $index => $image): ?>
-                                    <div class="col-3 mb-3">
-                                        <img src="<?php echo $image->getImagePath(); ?>" 
-                                             class="img-thumbnail gallery-thumbnail <?php echo ($image->isMain()) ? 'active' : ''; ?>" 
-                                             onclick="changeMainImage('<?php echo $image->getImagePath(); ?>', this)" 
-                                             alt="<?php echo $factory->getTitle() . ' - Image ' . ($index + 1); ?>">
-                                    </div>
-                                <?php endforeach; ?>
+                            <div class="thumbnail-slider">
+                                <button class="slider-nav-btn prev" onclick="slideThumbnails(-1)">
+                                    <i class="fas fa-chevron-left"></i>
+                                </button>
+                                
+                                <div class="thumbnails-container" id="thumbnailsContainer">
+                                    <?php foreach ($images as $index => $image): ?>
+                                        <div class="thumbnail-item">
+                                            <img src="<?php echo $image->getFullImagePath(); ?>" 
+                                                 class="img-thumbnail gallery-thumbnail <?php echo ($image->isMain()) ? 'active' : ''; ?>" 
+                                                 onclick="changeMainImage('<?php echo $image->getFullImagePath(); ?>', this)" 
+                                                 alt="<?php echo $factory->getTitle() . ' - Image ' . ($index + 1); ?>">
+                                        </div>
+                                    <?php endforeach; ?>
+                                </div>
+                                
+                                <button class="slider-nav-btn next" onclick="slideThumbnails(1)">
+                                    <i class="fas fa-chevron-right"></i>
+                                </button>
                             </div>
                         <?php endif; ?>
                     </div>
@@ -116,29 +126,57 @@ if ($factoryExists) {
                             <?php if ($address): ?>
                             <li>
                                 <i class="fas fa-map-marker-alt"></i>
-                                <strong>Location:</strong> <?php echo $address->getCity() . ', ' . $address->getCountry(); ?>
+                                <strong>Location:</strong> <?php echo $address->getFormattedAddress(); ?>
                             </li>
                             <?php endif; ?>
                             <li>
                                 <i class="fas fa-ruler-combined"></i>
                                 <strong>Total Area:</strong> <?php echo number_format($factory->getArea()); ?> sq m
                             </li>
+                            
+                            <!-- Factory Categories -->
+                            <?php
+                            $categories = $factory->getCategories();
+                            if (!empty($categories)): ?>
+                            <li>
+                                <i class="fas fa-tags"></i>
+                                <strong>Categories:</strong> 
+                                <div class="mt-2">
+                                    <?php foreach ($categories as $category): ?>
+                                    <span class="badge badge-pill badge-primary mr-2 mb-1"><?php echo htmlspecialchars($category->getName()); ?></span>
+                                    <?php endforeach; ?>
+                                </div>
+                            </li>
+                            <?php endif; ?>
+                            
                             <li>
                                 <i class="fas fa-tag"></i>
                                 <strong>Status:</strong> 
-                                <span class="badge badge-success"><?php echo ucfirst($factory->getStatus()); ?></span>
+                                <span class="badge badge-<?php echo $factory->getStatus() == 'available' ? 'success' : ($factory->getStatus() == 'pending' ? 'warning' : 'secondary'); ?>">
+                                    <?php echo ucfirst($factory->getStatus()); ?>
+                                </span>
                             </li>
                             <li>
                                 <i class="fas fa-calendar-alt"></i>
                                 <strong>Listed:</strong> <?php echo date('F d, Y', strtotime($factory->getDateAdded())); ?>
                             </li>
+                            <?php if ($factory->getUserId()): ?>
+                            <li>
+                                <i class="fas fa-user"></i>
+                                <strong>Listed By:</strong> 
+                                <?php 
+                                $owner = $factory->getOwner();
+                                echo $owner ? htmlspecialchars($owner->getName()) : 'Admin'; 
+                                ?>
+                            </li>
+                            <?php endif; ?>
                         </ul>
                         
                         <div class="factory-contact mt-4">
                             <h5 class="mb-3"><i class="fas fa-phone"></i> Contact Information</h5>
                             <?php $contactInfo = $factory->getContactInfo(); ?>
                             <?php if (!empty($contactInfo)): ?>
-                                <p><?php echo nl2br($contactInfo); ?></p>
+                                <p><?php echo nl2br(htmlspecialchars($contactInfo)); ?></p>
                             <?php else: ?>
                                 <p>
                                     For more information about this factory, please contact our office:
@@ -172,12 +210,33 @@ if ($factoryExists) {
                     </div>
                     <div class="card-body">
                         <div class="factory-description">
-                            <?php echo nl2br($factory->getDescription()); ?>
+                            <?php echo nl2br(htmlspecialchars($factory->getDescription())); ?>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
+        
+        <!-- Factory Location Map -->
+        <?php if ($address && $address->getLatitude() && $address->getLongitude()): ?>
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="mb-0"><i class="fas fa-map-marked-alt"></i> Location Map</h3>
+                    </div>
+                    <div class="card-body">
+                        <div id="factory-map" 
+                             data-lat="<?php echo floatval($address->getLatitude()); ?>" 
+                             data-lng="<?php echo floatval($address->getLongitude()); ?>"
+                             data-title="<?php echo htmlspecialchars($factory->getTitle()); ?>"
+                             style="height: 400px;">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <?php endif; ?>
         
         <!-- Related Factories -->
         <?php
@@ -210,7 +269,7 @@ if ($factoryExists) {
                 <div class="card factory-card h-100">
                     <div class="card-img-top-wrapper">
                         <?php if ($relatedMainImage): ?>
-                            <img src="<?php echo $relatedMainImage->getImagePath(); ?>" class="card-img-top" alt="<?php echo $related->getTitle(); ?>">
+                            <img src="<?php echo $relatedMainImage->getFullImagePath(); ?>" class="card-img-top" alt="<?php echo $related->getTitle(); ?>">
                         <?php else: ?>
                             <img src="images/factory-placeholder.jpg" class="card-img-top" alt="Factory Placeholder">
                         <?php endif; ?>
@@ -244,113 +303,15 @@ if ($factoryExists) {
     <?php endif; ?>
 </div>
 
-<style>
-.main-image-container {
-    position: relative;
-    border-radius: 5px;
-    overflow: hidden;
-    height: 400px;
-}
+<!-- Add Leaflet CSS in the head section -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+      crossorigin=""/>
 
-.main-image {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    border-radius: 5px;
-}
-
-.gallery-thumbnail {
-    cursor: pointer;
-    height: 80px;
-    object-fit: cover;
-    transition: all 0.3s;
-}
-
-.gallery-thumbnail.active {
-    border: 3px solidrgb(22, 190, 109);
-}
-
-.featured-badge-details {
-    position: absolute;
-    top: 20px;
-    left: -35px;
-    transform: rotate(-45deg);
-    background-color: #ffc107;
-    padding: 5px 30px;
-    color: #343a40;
-    font-weight: bold;
-    z-index: 1;
-}
-
-.property-type-badge-details {
-    position: absolute;
-    top: 20px;
-    right: 20px;
-    padding: 8px 16px;
-    color: white;
-    font-weight: bold;
-    border-radius: 4px;
-    z-index: 1;
-}
-
-.property-type-badge-details.sale {
-    background-color: #28a745;
-}
-
-.property-type-badge-details.rent {
-    background-color: #17a2b8;
-}
-
-.factory-title {
-    font-size: 1.8rem;
-    font-weight: 700;
-}
-
-.factory-price {
-    background-color: #f8f9fa;
-    padding: 15px;
-    border-radius: 5px;
-    border-left: 5px solid #28a745;
-}
-
-.price-label {
-    font-weight: 600;
-    color: #6c757d;
-}
-
-.price-amount {
-    font-size: 1.5rem;
-    font-weight: 700;
-    color: #28a745;
-    margin-left: 8px;
-}
-
-.price-period {
-    font-size: 0.9rem;
-    color: #6c757d;
-}
-
-.factory-details-list {
-    list-style: none;
-    padding-left: 0;
-    margin-top: 20px;
-}
-
-.factory-details-list li {
-    padding: 10px 0;
-    border-bottom: 1px solid #eee;
-}
-
-.factory-details-list i {
-    margin-right: 10px;
-    color: #6c757d;
-}
-
-.factory-description {
-    font-size: 1rem;
-    line-height: 1.6;
-}
-</style>
+<!-- Add Leaflet JavaScript Library -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+        crossorigin=""></script>
 
 <script>
 function changeMainImage(imagePath, thumbnail) {
@@ -362,6 +323,62 @@ function changeMainImage(imagePath, thumbnail) {
     thumbnails.forEach(item => item.classList.remove('active'));
     thumbnail.classList.add('active');
 }
+
+// Thumbnail slider functionality
+let currentPosition = 0;
+const thumbnailWidth = 90; // 80px width + 10px margins
+
+function slideThumbnails(direction) {
+    const container = document.getElementById('thumbnailsContainer');
+    const thumbnails = container.querySelectorAll('.thumbnail-item');
+    const maxPosition = (thumbnails.length - Math.floor(container.clientWidth / thumbnailWidth)) * thumbnailWidth;
+    
+    // Calculate new position
+    currentPosition = currentPosition + direction * thumbnailWidth;
+    
+    // Apply boundaries
+    if (currentPosition < 0) currentPosition = 0;
+    if (currentPosition > maxPosition) currentPosition = maxPosition;
+    
+    // Apply transform
+    container.style.transform = `translateX(-${currentPosition}px)`;
+}
+
+// Initialize slider on window resize to handle responsiveness
+window.addEventListener('resize', function() {
+    // Reset position when window size changes
+    currentPosition = 0;
+    const container = document.getElementById('thumbnailsContainer');
+    if (container) container.style.transform = 'translateX(0)';
+});
+
+<?php if ($address && $address->getLatitude() && $address->getLongitude()): ?>
+// Initialize the map
+document.addEventListener('DOMContentLoaded', function() {
+    // Create map instance
+    const lat = document.getElementById('factory-map').dataset.lat;
+    const lng = document.getElementById('factory-map').dataset.lng;
+    const title = document.getElementById('factory-map').dataset.title;
+    
+    const map = L.map('factory-map').setView([lat, lng], 14);
+    
+    // Add OpenStreetMap tile layer
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '© OpenStreetMap contributors'
+    }).addTo(map);
+    
+    // Add marker for factory location
+    L.marker([lat, lng]).addTo(map)
+        .bindPopup(title)
+        .openPopup();
+    
+    // Fix for map rendering issues - force a resize after the page loads
+    setTimeout(function() {
+        map.invalidateSize();
+    }, 100);
+});
+<?php endif; ?>
 </script>
 
 <?php include 'includes/footer.php'; ?>

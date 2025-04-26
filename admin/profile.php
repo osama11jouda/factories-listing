@@ -1,4 +1,9 @@
-<?php include 'includes/header.php'; ?>
+<?php 
+include 'includes/header.php';
+require_once '../models/User.php';
+require_once '../models/Factory.php';
+require_once '../models/ContactMessage.php';
+?>
 
 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
     <h1 class="h2">Admin Profile</h1>
@@ -9,51 +14,42 @@
 $success = false;
 $error = '';
 
-// Get admin information
+// Get admin information from User model
 $adminId = $_SESSION['admin_id'];
-$query = "SELECT * FROM users WHERE id = $adminId AND is_admin = 1";
-$result = mysqli_query($conn, $query);
-$admin = mysqli_fetch_assoc($result);
+$admin = new User();
+$admin->findById($adminId);
 
 // Process profile update form
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_profile'])) {
     // Get form data
-    $name = mysqli_real_escape_string($conn, $_POST['name']);
-    $email = mysqli_real_escape_string($conn, $_POST['email']);
-    $phone = mysqli_real_escape_string($conn, $_POST['phone']);
-    $company = mysqli_real_escape_string($conn, $_POST['company']);
+    $name = $_POST['name'];
+    $email = $_POST['email'];
+    $phone = $_POST['phone'];
+    $company = $_POST['company'];
     
     // Check if email exists and is not current user's email
-    if ($email != $admin['email']) {
-        $checkQuery = "SELECT * FROM users WHERE email = '$email'";
-        $checkResult = mysqli_query($conn, $checkQuery);
-        
-        if (mysqli_num_rows($checkResult) > 0) {
+    if ($email != $admin->getEmail()) {
+        $checkUser = new User();
+        if ($checkUser->findByEmail($email)) {
             $error = "Email address is already in use.";
         }
     }
     
     // Update profile if no error
     if (empty($error)) {
-        $updateQuery = "UPDATE users SET 
-                        name = '$name', 
-                        email = '$email', 
-                        phone = '$phone', 
-                        company = '$company' 
-                        WHERE id = $adminId";
+        $admin->setName($name);
+        $admin->setEmail($email);
+        $admin->setPhone($phone);
+        $admin->setCompany($company);
         
-        if (mysqli_query($conn, $updateQuery)) {
+        if ($admin->update()) {
             // Update session variables
             $_SESSION['admin_name'] = $name;
             $_SESSION['admin_email'] = $email;
             
             $success = true;
-            
-            // Refresh admin data
-            $result = mysqli_query($conn, $query);
-            $admin = mysqli_fetch_assoc($result);
         } else {
-            $error = "Profile update failed: " . mysqli_error($conn);
+            $error = "Profile update failed.";
         }
     }
 }
@@ -61,9 +57,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_profile'])) {
 // Process password update form
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_password'])) {
     // Get password data
-    $current_password = mysqli_real_escape_string($conn, $_POST['current_password']);
-    $new_password = mysqli_real_escape_string($conn, $_POST['new_password']);
-    $confirm_password = mysqli_real_escape_string($conn, $_POST['confirm_password']);
+    $current_password = $_POST['current_password'];
+    $new_password = $_POST['new_password'];
+    $confirm_password = $_POST['confirm_password'];
     
     // Validate input
     if (empty($current_password) || empty($new_password) || empty($confirm_password)) {
@@ -74,17 +70,16 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_password'])) {
         $error = "Password must be at least 8 characters long.";
     } else {
         // Verify current password
-        if (password_verify($current_password, $admin['password'])) {
-            // Hash the new password
-            $hashed_password = password_hash($new_password, PASSWORD_DEFAULT);
+        if ($admin->verifyPassword($current_password)) {
+            // Set and hash the new password
+            $admin->setPassword($new_password);
+            $admin->hashPassword();
             
             // Update password
-            $updateQuery = "UPDATE users SET password = '$hashed_password' WHERE id = $adminId";
-            
-            if (mysqli_query($conn, $updateQuery)) {
+            if ($admin->updatePassword()) {
                 $success = true;
             } else {
-                $error = "Password update failed: " . mysqli_error($conn);
+                $error = "Password update failed.";
             }
         } else {
             $error = "Current password is incorrect.";
@@ -94,44 +89,11 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_password'])) {
 
 // Get activity statistics
 $stats = [
-    'factories' => 0,
-    'users' => 0,
-    'active_users' => 0,
-    'messages' => 0,
-    'last_login' => 'N/A'
+    'factories' => Factory::countAll(),
+    'users' => User::countAll(),
+    'active_users' => User::countAll(['is_active' => 1]),
+    'messages' => ContactMessage::countAll(),
 ];
-
-// Count factories
-$query = "SELECT COUNT(*) as count FROM factories";
-$result = mysqli_query($conn, $query);
-if ($result) {
-    $row = mysqli_fetch_assoc($result);
-    $stats['factories'] = $row['count'];
-}
-
-// Count users
-$query = "SELECT COUNT(*) as count FROM users WHERE is_admin = 0";
-$result = mysqli_query($conn, $query);
-if ($result) {
-    $row = mysqli_fetch_assoc($result);
-    $stats['users'] = $row['count'];
-}
-
-// Count active users
-$query = "SELECT COUNT(*) as count FROM users WHERE is_admin = 0 AND is_active = 1";
-$result = mysqli_query($conn, $query);
-if ($result) {
-    $row = mysqli_fetch_assoc($result);
-    $stats['active_users'] = $row['count'];
-}
-
-// Count messages
-$query = "SELECT COUNT(*) as count FROM contact_messages";
-$result = mysqli_query($conn, $query);
-if ($result) {
-    $row = mysqli_fetch_assoc($result);
-    $stats['messages'] = $row['count'];
-}
 ?>
 
 <?php if ($success): ?>
@@ -164,17 +126,17 @@ if ($result) {
                     <div class="admin-avatar mb-3">
                         <i class="fas fa-user-shield fa-3x"></i>
                     </div>
-                    <h4><?php echo htmlspecialchars($admin['name']); ?></h4>
+                    <h4><?php echo htmlspecialchars($admin->getName()); ?></h4>
                     <p class="badge badge-dark">System Administrator</p>
                 </div>
                 
                 <hr>
                 
                 <div>
-                    <p><i class="fas fa-envelope text-muted mr-2"></i> <strong>Email:</strong> <?php echo htmlspecialchars($admin['email']); ?></p>
-                    <p><i class="fas fa-phone text-muted mr-2"></i> <strong>Phone:</strong> <?php echo htmlspecialchars($admin['phone']); ?></p>
-                    <p><i class="fas fa-building text-muted mr-2"></i> <strong>Company:</strong> <?php echo !empty($admin['company']) ? htmlspecialchars($admin['company']) : 'Not specified'; ?></p>
-                    <p><i class="fas fa-calendar-alt text-muted mr-2"></i> <strong>Registered:</strong> <?php echo date('M d, Y', strtotime($admin['registration_date'])); ?></p>
+                    <p><i class="fas fa-envelope text-muted mr-2"></i> <strong>Email:</strong> <?php echo htmlspecialchars($admin->getEmail()); ?></p>
+                    <p><i class="fas fa-phone text-muted mr-2"></i> <strong>Phone:</strong> <?php echo htmlspecialchars($admin->getPhone()); ?></p>
+                    <p><i class="fas fa-building text-muted mr-2"></i> <strong>Company:</strong> <?php echo !empty($admin->getCompany()) ? htmlspecialchars($admin->getCompany()) : 'Not specified'; ?></p>
+                    <p><i class="fas fa-calendar-alt text-muted mr-2"></i> <strong>Registered:</strong> <?php echo date('M d, Y', strtotime($admin->getRegistrationDate())); ?></p>
                 </div>
             </div>
         </div>
@@ -266,22 +228,22 @@ if ($result) {
                         <form method="post" action="<?php echo htmlspecialchars($_SERVER["PHP_SELF"]); ?>">
                             <div class="form-group">
                                 <label for="name">Full Name</label>
-                                <input type="text" class="form-control" id="name" name="name" value="<?php echo htmlspecialchars($admin['name']); ?>" required>
+                                <input type="text" class="form-control" id="name" name="name" value="<?php echo htmlspecialchars($admin->getName()); ?>" required>
                             </div>
                             
                             <div class="form-group">
                                 <label for="email">Email Address</label>
-                                <input type="email" class="form-control" id="email" name="email" value="<?php echo htmlspecialchars($admin['email']); ?>" required>
+                                <input type="email" class="form-control" id="email" name="email" value="<?php echo htmlspecialchars($admin->getEmail()); ?>" required>
                             </div>
                             
                             <div class="form-group">
                                 <label for="phone">Phone Number</label>
-                                <input type="tel" class="form-control" id="phone" name="phone" value="<?php echo htmlspecialchars($admin['phone']); ?>">
+                                <input type="tel" class="form-control" id="phone" name="phone" value="<?php echo htmlspecialchars($admin->getPhone()); ?>">
                             </div>
                             
                             <div class="form-group">
                                 <label for="company">Company</label>
-                                <input type="text" class="form-control" id="company" name="company" value="<?php echo htmlspecialchars($admin['company'] ?? ''); ?>">
+                                <input type="text" class="form-control" id="company" name="company" value="<?php echo htmlspecialchars($admin->getCompany() ?? ''); ?>">
                             </div>
                             
                             <button type="submit" name="update_profile" class="btn btn-primary">

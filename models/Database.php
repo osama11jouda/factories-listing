@@ -56,6 +56,10 @@ class Database {
     
     // Escape string for security
     public function escapeString($string) {
+        // Handle null values by converting them to empty strings
+        if ($string === null) {
+            return '';
+        }
         return mysqli_real_escape_string($this->connection, $string);
     }
     

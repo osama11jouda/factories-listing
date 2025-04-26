@@ -3,6 +3,7 @@ include 'includes/header.php';
 require_once 'models/Factory.php';
 require_once 'models/FactoryImage.php';
 require_once 'models/Address.php';
+require_once 'models/Category.php'; // Added Category model
 
 // Check if user is logged in and active
 $loggedIn = isset($_SESSION['user_id']);
@@ -17,24 +18,27 @@ $offset = ($page - 1) * $itemsPerPage;
 $search = isset($_GET['search']) ? $_GET['search'] : '';
 $typeFilter = isset($_GET['type']) ? $_GET['type'] : '';
 $locationFilter = isset($_GET['location']) ? $_GET['location'] : '';
-$minPrice = isset($_GET['min_price']) && $_GET['min_price'] !== '' ? floatval($_GET['min_price']) : null;
-$maxPrice = isset($_GET['max_price']) && $_GET['max_price'] !== '' ? floatval($_GET['max_price']) : null;
+$categoryFilter = isset($_GET['category']) ? intval($_GET['category']) : ''; // Added category filter parameter
 
 // Build filters for the Factory model
 $filters = [
     'status' => 'available'
 ];
 
+if (!empty($search)) {
+    $filters['search'] = $search;
+}
+
 if (!empty($typeFilter)) {
     $filters['type'] = $typeFilter;
 }
 
-if ($minPrice !== null) {
-    $filters['min_price'] = $minPrice;
+if (!empty($locationFilter)) {
+    $filters['city'] = $locationFilter;
 }
 
-if ($maxPrice !== null) {
-    $filters['max_price'] = $maxPrice;
+if (!empty($categoryFilter)) {
+    $filters['category_id'] = $categoryFilter; // Add category filter
 }
 
 // Get total factories count with filters
@@ -54,6 +58,9 @@ $locations = [];
 while ($row = $db->fetchArray($locationsResult)) {
     $locations[] = $row['city'];
 }
+
+// Get unique categories for filter dropdown
+$categories = Category::getAll();
 ?>
 
 <div class="container-wide py-5">
@@ -97,11 +104,15 @@ while ($row = $db->fetchArray($locationsResult)) {
                                 <?php endforeach; ?>
                             </select>
                         </div>
-                        <div class="col-md-2 mb-3">
-                            <input type="number" class="form-control" name="min_price" placeholder="Min Price" value="<?php echo $minPrice !== null ? $minPrice : ''; ?>">
-                        </div>
-                        <div class="col-md-2 mb-3">
-                            <input type="number" class="form-control" name="max_price" placeholder="Max Price" value="<?php echo $maxPrice !== null ? $maxPrice : ''; ?>">
+                        <div class="col-md-4 mb-3">
+                            <select name="category" class="form-control">
+                                <option value="">All Categories</option>
+                                <?php foreach ($categories as $category): ?>
+                                    <option value="<?php echo $category->getId(); ?>" <?php echo $categoryFilter == $category->getId() ? 'selected' : ''; ?>>
+                                        <?php echo $category->getName(); ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
                         </div>
                     </div>
                     <div class="row">
@@ -137,7 +148,7 @@ while ($row = $db->fetchArray($locationsResult)) {
                             <?php endif; ?>
                             <div class="card-img-top-wrapper">
                                 <?php if ($mainImage): ?>
-                                    <img src="<?php echo $mainImage->getImagePath(); ?>" class="card-img-top" alt="<?php echo $factory->getTitle(); ?>">
+                                    <img src="<?php echo $mainImage->getFullImagePath(); ?>" class="card-img-top" alt="<?php echo $factory->getTitle(); ?>">
                                 <?php else: ?>
                                     <img src="images/factory-placeholder.jpg" class="card-img-top" alt="Factory Placeholder">
                                 <?php endif; ?>
@@ -182,21 +193,21 @@ while ($row = $db->fetchArray($locationsResult)) {
                 <nav aria-label="Page navigation">
                     <ul class="pagination justify-content-center">
                         <li class="page-item <?php echo $page <= 1 ? 'disabled' : ''; ?>">
-                            <a class="page-link" href="?page=<?php echo $page - 1; ?>&search=<?php echo urlencode($search); ?>&type=<?php echo urlencode($typeFilter); ?>&location=<?php echo urlencode($locationFilter); ?>&min_price=<?php echo $minPrice; ?>&max_price=<?php echo $maxPrice; ?>" aria-label="Previous">
+                            <a class="page-link" href="?page=<?php echo $page - 1; ?>&search=<?php echo urlencode($search); ?>&type=<?php echo urlencode($typeFilter); ?>&location=<?php echo urlencode($locationFilter); ?>&category=<?php echo urlencode($categoryFilter); ?>" aria-label="Previous">
                                 <span aria-hidden="true">&laquo;</span>
                             </a>
                         </li>
                         
                         <?php for ($i = 1; $i <= $totalPages; $i++): ?>
                             <li class="page-item <?php echo $page == $i ? 'active' : ''; ?>">
-                                <a class="page-link" href="?page=<?php echo $i; ?>&search=<?php echo urlencode($search); ?>&type=<?php echo urlencode($typeFilter); ?>&location=<?php echo urlencode($locationFilter); ?>&min_price=<?php echo $minPrice; ?>&max_price=<?php echo $maxPrice; ?>">
+                                <a class="page-link" href="?page=<?php echo $i; ?>&search=<?php echo urlencode($search); ?>&type=<?php echo urlencode($typeFilter); ?>&location=<?php echo urlencode($locationFilter); ?>&category=<?php echo urlencode($categoryFilter); ?>">
                                     <?php echo $i; ?>
                                 </a>
                             </li>
                         <?php endfor; ?>
                         
                         <li class="page-item <?php echo $page >= $totalPages ? 'disabled' : ''; ?>">
-                            <a class="page-link" href="?page=<?php echo $page + 1; ?>&search=<?php echo urlencode($search); ?>&type=<?php echo urlencode($typeFilter); ?>&location=<?php echo urlencode($locationFilter); ?>&min_price=<?php echo $minPrice; ?>&max_price=<?php echo $maxPrice; ?>" aria-label="Next">
+                            <a class="page-link" href="?page=<?php echo $page + 1; ?>&search=<?php echo urlencode($search); ?>&type=<?php echo urlencode($typeFilter); ?>&location=<?php echo urlencode($locationFilter); ?>&category=<?php echo urlencode($categoryFilter); ?>" aria-label="Next">
                                 <span aria-hidden="true">&raquo;</span>
                             </a>
                         </li>
@@ -207,89 +218,5 @@ while ($row = $db->fetchArray($locationsResult)) {
         <?php endif; ?>
     <?php endif; ?>
 </div>
-
-<style>
-.factory-card {
-    position: relative;
-    transition: transform 0.3s ease-in-out, box-shadow 0.3s ease-in-out;
-    border: 1px solid #eee;
-    overflow: hidden;
-}
-
-.factory-card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 10px 20px rgba(0,0,0,0.1);
-}
-
-.card-img-top-wrapper {
-    position: relative;
-    height: 200px;
-    overflow: hidden;
-}
-
-.card-img-top {
-    height: 100%;
-    object-fit: cover;
-    width: 100%;
-    transition: transform 0.3s ease;
-}
-
-.factory-card:hover .card-img-top {
-    transform: scale(1.05);
-}
-
-.property-type-badge {
-    position: absolute;
-    top: 10px;
-    right: 10px;
-    z-index: 1;
-    padding: 5px 10px;
-    color: white;
-    font-size: 0.8rem;
-    font-weight: bold;
-    border-radius: 3px;
-}
-
-.property-type-badge.sale {
-    background-color: #28a745;
-}
-
-.property-type-badge.rent {
-    background-color: #17a2b8;
-}
-
-.featured-badge {
-    position: absolute;
-    top: 10px;
-    left: -30px;
-    transform: rotate(-45deg);
-    z-index: 1;
-    background-color: #ffc107;
-    padding: 5px 30px;
-    color: #343a40;
-    font-size: 0.7rem;
-    font-weight: bold;
-}
-
-.price {
-    color: #28a745;
-    font-weight: bold;
-}
-
-.location, .area {
-    font-size: 0.9rem;
-    color: #6c757d;
-    margin-bottom: 8px;
-}
-
-.pagination .page-link {
-    color: #343a40;
-}
-
-.pagination .page-item.active .page-link {
-    background-color: #343a40;
-    border-color: #343a40;
-}
-</style>
 
 <?php include 'includes/footer.php'; ?>

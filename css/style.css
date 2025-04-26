@@ -433,6 +433,9 @@ section {
   padding: 12px;
   margin-bottom: 1.25rem;
 }
+.form-control {
+  padding-left: 2rem !important;
+}
 
 .contact-section .btn {
   padding: 12px;
@@ -445,10 +448,15 @@ section {
   margin-bottom: 30px;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
   transition: transform 0.3s ease;
+  position: relative;
+  border: 1px solid #eee;
+  overflow: hidden;
+  transition: transform 0.3s ease-in-out, box-shadow 0.3s ease-in-out;
 }
 
 .factory-card:hover {
   transform: translateY(-5px);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
 }
 
 .factory-card .card-img-top {
@@ -459,6 +467,77 @@ section {
 .factory-card .badge {
   font-size: 0.8rem;
   margin-right: 5px;
+}
+
+.card-img-top-wrapper {
+  position: relative;
+  height: 200px;
+  overflow: hidden;
+}
+
+.card-img-top {
+  height: 100%;
+  object-fit: cover;
+  width: 100%;
+  transition: transform 0.3s ease;
+}
+
+.factory-card:hover .card-img-top {
+  transform: scale(1.05);
+}
+
+.property-type-badge {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 1;
+  padding: 5px 10px;
+  color: white;
+  font-size: 0.8rem;
+  font-weight: bold;
+  border-radius: 3px;
+}
+
+.property-type-badge.sale {
+  background-color: #28a745;
+}
+
+.property-type-badge.rent {
+  background-color: #17a2b8;
+}
+
+.featured-badge {
+  position: absolute;
+  top: 10px;
+  left: -30px;
+  transform: rotate(-45deg);
+  z-index: 1;
+  background-color: #ffc107;
+  padding: 5px 30px;
+  color: #343a40;
+  font-size: 0.7rem;
+  font-weight: bold;
+}
+
+.price {
+  color: #28a745;
+  font-weight: bold;
+}
+
+.location,
+.area {
+  font-size: 0.9rem;
+  color: #6c757d;
+  margin-bottom: 8px;
+}
+
+.pagination .page-link {
+  color: #343a40;
+}
+
+.pagination .page-item.active .page-link {
+  background-color: #343a40;
+  border-color: #343a40;
 }
 
 /* Form Styling */
@@ -984,4 +1063,233 @@ section {
 
 .subscription-step:hover {
   transform: translateY(-10px);
+}
+
+/* Profile Page Styles */
+.avatar-circle {
+  width: 100px;
+  height: 100px;
+  background-color: #6c757d;
+  color: #fff;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 48px;
+  font-weight: bold;
+  text-transform: uppercase;
+}
+
+.avatar-initials {
+  line-height: 1;
+}
+
+.status-indicator {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+}
+
+.subscription-benefits {
+  border-left: 4px solid #17a2b8;
+}
+
+/* Factory Details Page Styles */
+.main-image-container {
+  position: relative;
+  border-radius: 5px;
+  overflow: hidden;
+  height: 400px;
+}
+
+.main-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 5px;
+}
+
+.gallery-thumbnail {
+  cursor: pointer;
+  height: 80px;
+  object-fit: cover;
+  transition: all 0.3s;
+}
+
+.gallery-thumbnail.active {
+  border: 3px solid rgb(22, 190, 109);
+}
+
+.featured-badge-details {
+  position: absolute;
+  top: 20px;
+  left: -35px;
+  transform: rotate(-45deg);
+  background-color: #ffc107;
+  padding: 5px 30px;
+  color: #343a40;
+  font-weight: bold;
+  z-index: 1;
+}
+
+.property-type-badge-details {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  padding: 8px 16px;
+  color: white;
+  font-weight: bold;
+  border-radius: 4px;
+  z-index: 1;
+}
+
+.property-type-badge-details.sale {
+  background-color: #28a745;
+}
+
+.property-type-badge-details.rent {
+  background-color: #17a2b8;
+}
+
+.factory-title {
+  font-size: 1.8rem;
+  font-weight: 700;
+}
+
+.factory-price {
+  background-color: #f8f9fa;
+  padding: 15px;
+  border-radius: 5px;
+  border-left: 5px solid #28a745;
+}
+
+.price-label {
+  font-weight: 600;
+  color: #6c757d;
+}
+
+.price-amount {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #28a745;
+  margin-left: 8px;
+}
+
+.price-period {
+  font-size: 0.9rem;
+  color: #6c757d;
+}
+
+.factory-details-list {
+  list-style: none;
+  padding-left: 0;
+  margin-top: 20px;
+}
+
+.factory-details-list li {
+  padding: 10px 0;
+  border-bottom: 1px solid #eee;
+}
+
+.factory-details-list i {
+  margin-right: 10px;
+  color: #6c757d;
+}
+
+.factory-description {
+  font-size: 1rem;
+  line-height: 1.6;
+}
+
+/* Contact Page Styles */
+.contact-info-item {
+  padding: 15px;
+  transition: transform 0.3s ease-in-out;
+}
+
+.contact-info-item:hover {
+  transform: translateY(-5px);
+}
+
+.contact-icon {
+  font-size: 2.5rem;
+  color: rgb(32, 179, 96);
+  margin-bottom: 15px;
+}
+
+.contact-info-item h5 {
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+
+.contact-info-item p {
+  color: #6c757d;
+  margin-bottom: 0;
+}
+
+/* Thumbnail Slider Styles */
+.thumbnail-slider {
+  position: relative;
+  overflow: hidden;
+  margin-top: 15px;
+  padding: 0 30px;
+}
+
+.thumbnails-container {
+  display: flex;
+  transition: transform 0.3s ease;
+  padding: 10px 0;
+}
+
+.thumbnail-item {
+  flex: 0 0 auto;
+  width: 80px;
+  margin: 0 5px;
+}
+
+.thumbnail-item img {
+  width: 80px;
+  height: 60px;
+  object-fit: cover;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.thumbnail-item img:hover {
+  opacity: 0.8;
+}
+
+.thumbnail-item img.active {
+  border: 3px solid rgb(22, 190, 109);
+}
+
+.slider-nav-btn {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 30px;
+  height: 30px;
+  background-color: rgba(0, 0, 0, 0.5);
+  color: white;
+  border: none;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  z-index: 2;
+}
+
+.slider-nav-btn:hover {
+  background-color: rgba(0, 0, 0, 0.8);
+}
+
+.slider-nav-btn.prev {
+  left: 0;
+}
+
+.slider-nav-btn.next {
+  right: 0;
 }

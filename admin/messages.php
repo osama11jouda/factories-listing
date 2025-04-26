@@ -1,39 +1,11 @@
-<?php 
-include 'includes/header.php';
-require_once '../models/ContactMessage.php'; 
-?>
+<?php include 'includes/header.php'; ?>
+<?php require_once '../models/ContactMessage.php'; ?>
 
 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-    <h1 class="h2">Contact Messages</h1>
+    <h1 class="h2">Messages</h1>
 </div>
 
 <?php
-// Handle message marking as read/unread
-if (isset($_GET['read']) && is_numeric($_GET['read'])) {
-    $messageId = intval($_GET['read']);
-    $value = isset($_GET['value']) && $_GET['value'] == '1' ? true : false;
-    
-    $message = new ContactMessage();
-    if ($message->findById($messageId)) {
-        $message->setIsRead($value);
-        if ($message->markAsRead()) {
-            echo '<div class="alert alert-success alert-dismissible fade show" role="alert">
-                    Message status updated successfully.
-                    <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-                        <span aria-hidden="true">&times;</span>
-                    </button>
-                </div>';
-        } else {
-            echo '<div class="alert alert-danger alert-dismissible fade show" role="alert">
-                    Error updating message status.
-                    <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-                        <span aria-hidden="true">&times;</span>
-                    </button>
-                </div>';
-        }
-    }
-}
-
 // Handle message deletion
 if (isset($_GET['delete']) && is_numeric($_GET['delete'])) {
     $messageId = intval($_GET['delete']);
@@ -58,76 +30,60 @@ if (isset($_GET['delete']) && is_numeric($_GET['delete'])) {
     }
 }
 
+// Handle mark as read
+if (isset($_GET['read']) && is_numeric($_GET['read'])) {
+    $messageId = intval($_GET['read']);
+    
+    $message = new ContactMessage();
+    if ($message->findById($messageId)) {
+        if ($message->markAsRead()) {
+            echo '<div class="alert alert-success alert-dismissible fade show" role="alert">
+                    Message marked as read.
+                    <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>';
+        } else {
+            echo '<div class="alert alert-danger alert-dismissible fade show" role="alert">
+                    Error updating message status.
+                    <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>';
+        }
+    }
+}
+
 // Pagination parameters
 $page = isset($_GET['page']) ? intval($_GET['page']) : 1;
 $itemsPerPage = 10;
 $offset = ($page - 1) * $itemsPerPage;
 
-// Search parameters
-$search = isset($_GET['search']) ? $_GET['search'] : '';
-$readFilter = isset($_GET['read_status']) ? $_GET['read_status'] : '';
+// Filter parameters
+$filterRead = isset($_GET['filter']) ? $_GET['filter'] : '';
 
-// Get messages using the model
-$onlyUnread = ($readFilter === '0');
-$onlyRead = ($readFilter === '1');
-
-// Call our model methods accordingly
-if ($onlyUnread) {
-    $messages = ContactMessage::getAll($itemsPerPage, $offset, true);
-    $totalItems = ContactMessage::countAll(true);
-} elseif ($onlyRead) {
-    // For read messages, we need to get all but filter in PHP
-    $allMessages = ContactMessage::getAll(null, 0, false);
-    $readMessages = array_filter($allMessages, function($msg) {
-        return $msg->isRead();
-    });
-    
-    // Manual pagination for read messages
-    $totalItems = count($readMessages);
-    $messages = array_slice($readMessages, $offset, $itemsPerPage);
-} else {
-    $messages = ContactMessage::getAll($itemsPerPage, $offset);
-    $totalItems = ContactMessage::countAll();
-}
-
+// Get messages with filter
+$onlyUnread = ($filterRead === 'unread');
+$messages = ContactMessage::getAll($itemsPerPage, $offset, $onlyUnread);
+$totalItems = ContactMessage::countAll($onlyUnread);
 $totalPages = ceil($totalItems / $itemsPerPage);
-
-// Count unread messages
-$unreadCount = ContactMessage::countAll(true);
 ?>
 
-<!-- Search Form -->
+<!-- Filter Form -->
 <div class="card mb-4">
     <div class="card-body">
-        <div class="row align-items-center mb-3">
-            <div class="col-md-6">
-                <h5 class="mb-0">
-                    Total Messages: <?php echo $totalItems; ?> 
-                    <?php if ($unreadCount > 0): ?>
-                        <span class="badge badge-danger"><?php echo $unreadCount; ?> Unread</span>
-                    <?php endif; ?>
-                </h5>
-            </div>
-            <div class="col-md-6 text-right">
-                <a href="messages.php" class="btn btn-outline-secondary">
-                    <i class="fas fa-sync-alt"></i> Refresh
-                </a>
-            </div>
-        </div>
-        
         <form method="get" action="<?php echo htmlspecialchars($_SERVER['PHP_SELF']); ?>" class="row">
-            <div class="col-md-8 mb-2">
-                <input type="text" class="form-control" name="search" placeholder="Search messages..." value="<?php echo htmlspecialchars($search); ?>">
-            </div>
-            <div class="col-md-2 mb-2">
-                <select name="read_status" class="form-control">
+            <div class="col-md-3 mb-2">
+                <select name="filter" class="form-control">
                     <option value="">All Messages</option>
-                    <option value="0" <?php echo $readFilter === '0' ? 'selected' : ''; ?>>Unread</option>
-                    <option value="1" <?php echo $readFilter === '1' ? 'selected' : ''; ?>>Read</option>
+                    <option value="unread" <?php echo $filterRead === 'unread' ? 'selected' : ''; ?>>Unread Only</option>
                 </select>
             </div>
             <div class="col-md-2 mb-2">
-                <button type="submit" class="btn btn-primary btn-block">Search</button>
+                <button type="submit" class="btn btn-primary btn-block">Filter</button>
+            </div>
+            <div class="col-md-2 mb-2">
+                <a href="messages.php" class="btn btn-outline-secondary btn-block">Reset</a>
             </div>
         </form>
     </div>
@@ -137,93 +93,51 @@ $unreadCount = ContactMessage::countAll(true);
 <div class="card">
     <div class="card-body">
         <div class="table-responsive">
-            <table class="table table-hover">
+            <table class="table table-striped table-hover">
                 <thead>
                     <tr>
-                        <th>Status</th>
-                        <th>Date</th>
-                        <th>Name</th>
+                        <th>From</th>
                         <th>Email</th>
                         <th>Subject</th>
+                        <th>Date</th>
+                        <th>Status</th>
                         <th>Actions</th>
                     </tr>
                 </thead>
                 <tbody>
                     <?php 
-                    if (!empty($messages)): 
+                    if (count($messages) > 0): 
                         foreach ($messages as $message):
-                            $rowClass = $message->isRead() ? '' : 'table-active font-weight-bold';
                     ?>
-                        <tr class="<?php echo $rowClass; ?>">
+                        <tr class="<?php echo $message->isRead() ? '' : 'font-weight-bold'; ?>">
+                            <td><?php echo htmlspecialchars($message->getName()); ?></td>
+                            <td><?php echo htmlspecialchars($message->getEmail()); ?></td>
                             <td>
-                                <?php if ($message->isRead()): ?>
-                                    <i class="fas fa-envelope-open text-secondary"></i>
-                                <?php else: ?>
-                                    <i class="fas fa-envelope text-primary"></i>
-                                <?php endif; ?>
+                                <a href="view_message.php?id=<?php echo $message->getId(); ?>">
+                                    <?php echo htmlspecialchars($message->getSubject()); ?>
+                                </a>
                             </td>
                             <td><?php echo date('M d, Y', strtotime($message->getSubmissionDate())); ?></td>
-                            <td><?php echo htmlspecialchars($message->getName()); ?></td>
-                            <td><a href="mailto:<?php echo htmlspecialchars($message->getEmail()); ?>"><?php echo htmlspecialchars($message->getEmail()); ?></a></td>
-                            <td><?php echo htmlspecialchars($message->getSubject() ?: 'No Subject'); ?></td>
+                            <td>
+                                <?php if ($message->isRead()): ?>
+                                    <span class="badge badge-secondary">Read</span>
+                                <?php else: ?>
+                                    <span class="badge badge-warning">Unread</span>
+                                <?php endif; ?>
+                            </td>
                             <td>
                                 <div class="btn-group btn-group-sm">
-                                    <button type="button" class="btn btn-info" data-toggle="modal" data-target="#viewModal<?php echo $message->getId(); ?>">
+                                    <a href="view_message.php?id=<?php echo $message->getId(); ?>" class="btn btn-info" title="View">
                                         <i class="fas fa-eye"></i>
-                                    </button>
-                                    <?php if ($message->isRead()): ?>
-                                        <a href="messages.php?read=<?php echo $message->getId(); ?>&value=0" class="btn btn-secondary" title="Mark as Unread">
-                                            <i class="fas fa-envelope"></i>
-                                        </a>
-                                    <?php else: ?>
-                                        <a href="messages.php?read=<?php echo $message->getId(); ?>&value=1" class="btn btn-success" title="Mark as Read">
+                                    </a>
+                                    <?php if (!$message->isRead()): ?>
+                                        <a href="messages.php?read=<?php echo $message->getId(); ?>" class="btn btn-success" title="Mark as Read">
                                             <i class="fas fa-check"></i>
                                         </a>
                                     <?php endif; ?>
-                                    <a href="mailto:<?php echo htmlspecialchars($message->getEmail()); ?>" class="btn btn-primary" title="Reply">
-                                        <i class="fas fa-reply"></i>
-                                    </a>
                                     <a href="messages.php?delete=<?php echo $message->getId(); ?>" class="btn btn-danger" title="Delete" onclick="return confirm('Are you sure you want to delete this message?')">
                                         <i class="fas fa-trash-alt"></i>
                                     </a>
-                                </div>
-                                
-                                <!-- View Message Modal -->
-                                <div class="modal fade" id="viewModal<?php echo $message->getId(); ?>" tabindex="-1" aria-labelledby="viewModalLabel" aria-hidden="true">
-                                    <div class="modal-dialog">
-                                        <div class="modal-content">
-                                            <div class="modal-header">
-                                                <h5 class="modal-title" id="viewModalLabel">View Message</h5>
-                                                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                                                    <span aria-hidden="true">&times;</span>
-                                                </button>
-                                            </div>
-                                            <div class="modal-body">
-                                                <div class="card mb-3">
-                                                    <div class="card-body">
-                                                        <h6 class="card-subtitle mb-2 text-muted">From: <?php echo htmlspecialchars($message->getName()); ?> (<?php echo htmlspecialchars($message->getEmail()); ?>)</h6>
-                                                        <h6 class="card-subtitle mb-2 text-muted">Date: <?php echo date('F d, Y H:i', strtotime($message->getSubmissionDate())); ?></h6>
-                                                        <h5 class="card-title"><?php echo htmlspecialchars($message->getSubject() ?: 'No Subject'); ?></h5>
-                                                        <p class="card-text"><?php echo nl2br(htmlspecialchars($message->getMessage())); ?></p>
-                                                    </div>
-                                                </div>
-                                                
-                                                <?php
-                                                // Mark as read when viewed
-                                                if (!$message->isRead()) {
-                                                    $message->setIsRead(true);
-                                                    $message->markAsRead();
-                                                }
-                                                ?>
-                                            </div>
-                                            <div class="modal-footer">
-                                                <a href="mailto:<?php echo htmlspecialchars($message->getEmail()); ?>" class="btn btn-primary">
-                                                    <i class="fas fa-reply"></i> Reply by Email
-                                                </a>
-                                                <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
-                                            </div>
-                                        </div>
-                                    </div>
                                 </div>
                             </td>
                         </tr>
@@ -246,21 +160,21 @@ $unreadCount = ContactMessage::countAll(true);
 <nav aria-label="Page navigation" class="mt-4">
     <ul class="pagination justify-content-center">
         <li class="page-item <?php echo $page <= 1 ? 'disabled' : ''; ?>">
-            <a class="page-link" href="?page=<?php echo $page - 1; ?>&search=<?php echo urlencode($search); ?>&read_status=<?php echo urlencode($readFilter); ?>" aria-label="Previous">
+            <a class="page-link" href="?page=<?php echo $page - 1; ?>&filter=<?php echo urlencode($filterRead); ?>" aria-label="Previous">
                 <span aria-hidden="true">&laquo;</span>
             </a>
         </li>
         
         <?php for ($i = 1; $i <= $totalPages; $i++): ?>
             <li class="page-item <?php echo $page == $i ? 'active' : ''; ?>">
-                <a class="page-link" href="?page=<?php echo $i; ?>&search=<?php echo urlencode($search); ?>&read_status=<?php echo urlencode($readFilter); ?>">
+                <a class="page-link" href="?page=<?php echo $i; ?>&filter=<?php echo urlencode($filterRead); ?>">
                     <?php echo $i; ?>
                 </a>
             </li>
         <?php endfor; ?>
         
         <li class="page-item <?php echo $page >= $totalPages ? 'disabled' : ''; ?>">
-            <a class="page-link" href="?page=<?php echo $page + 1; ?>&search=<?php echo urlencode($search); ?>&read_status=<?php echo urlencode($readFilter); ?>" aria-label="Next">
+            <a class="page-link" href="?page=<?php echo $page + 1; ?>&filter=<?php echo urlencode($filterRead); ?>" aria-label="Next">
                 <span aria-hidden="true">&raquo;</span>
             </a>
         </li>

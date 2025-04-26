@@ -1,5 +1,6 @@
 <?php
 session_start();
+require_once '../models/User.php';
 
 // Check if already logged in as admin
 if(isset($_SESSION['admin_id'])) {
@@ -14,29 +15,29 @@ $error = '';
 
 // Process login form
 if($_SERVER["REQUEST_METHOD"] == "POST") {
-    $email = mysqli_real_escape_string($conn, $_POST['email']);
+    $email = $_POST['email'];
     $password = $_POST['password'];
     
-    // Validate the admin
-    $query = "SELECT id, name, email, password FROM users WHERE email = '$email' AND is_admin = 1";
-    $result = mysqli_query($conn, $query);
-    
-    if(mysqli_num_rows($result) == 1) {
-        $row = mysqli_fetch_assoc($result);
-        
-        if(password_verify($password, $row['password'])) {
-            // Store admin data in session
-            $_SESSION['admin_id'] = $row['id'];
-            $_SESSION['admin_name'] = $row['name'];
-            $_SESSION['admin_email'] = $row['email'];
-            
-            header("Location: dashboard.php");
-            exit;
+    // Validate the admin using User model
+    $user = new User();
+    if($user->findByEmail($email)) {
+        if($user->isAdmin()) {
+            if($user->verifyPassword($password)) {
+                // Store admin data in session
+                $_SESSION['admin_id'] = $user->getId();
+                $_SESSION['admin_name'] = $user->getName();
+                $_SESSION['admin_email'] = $user->getEmail();
+                
+                header("Location: dashboard.php");
+                exit;
+            } else {
+                $error = "Invalid password";
+            }
         } else {
-            $error = "Invalid password";
+            $error = "You do not have admin privileges";
         }
     } else {
-        $error = "Invalid email or you do not have admin privileges";
+        $error = "Invalid email address";
     }
 }
 ?>

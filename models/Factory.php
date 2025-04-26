@@ -128,50 +128,82 @@ class Factory {
         $db = Database::getInstance();
         
         $whereClauses = [];
+        $joinCategory = false;
+        
+        // Add search filter for title and description
+        if (!empty($filters['search'])) {
+            $search = $db->escapeString($filters['search']);
+            $whereClauses[] = "(f.title LIKE '%$search%' OR f.description LIKE '%$search%')";
+        }
         
         if (!empty($filters['type'])) {
             $type = $db->escapeString($filters['type']);
-            $whereClauses[] = "type = '$type'";
+            $whereClauses[] = "f.type = '$type'";
         }
         
         if (!empty($filters['status'])) {
             $status = $db->escapeString($filters['status']);
-            $whereClauses[] = "status = '$status'";
+            $whereClauses[] = "f.status = '$status'";
         }
         
         if (!empty($filters['featured'])) {
-            $whereClauses[] = "featured = 1";
+            $whereClauses[] = "f.featured = 1";
         }
         
         if (!empty($filters['min_price'])) {
             $min_price = floatval($filters['min_price']);
-            $whereClauses[] = "price >= $min_price";
+            $whereClauses[] = "f.price >= $min_price";
         }
         
         if (!empty($filters['max_price'])) {
             $max_price = floatval($filters['max_price']);
-            $whereClauses[] = "price <= $max_price";
+            $whereClauses[] = "f.price <= $max_price";
         }
         
         if (!empty($filters['min_area'])) {
             $min_area = floatval($filters['min_area']);
-            $whereClauses[] = "area >= $min_area";
+            $whereClauses[] = "f.area >= $min_area";
         }
         
         if (!empty($filters['max_area'])) {
             $max_area = floatval($filters['max_area']);
-            $whereClauses[] = "area <= $max_area";
+            $whereClauses[] = "f.area <= $max_area";
         }
         
         if (!empty($filters['user_id'])) {
             $user_id = intval($filters['user_id']);
-            $whereClauses[] = "user_id = $user_id";
+            $whereClauses[] = "f.user_id = $user_id";
+        }
+        
+        // Add category filter
+        if (!empty($filters['category_id'])) {
+            $category_id = intval($filters['category_id']);
+            $joinCategory = true;
+            $whereClauses[] = "fc.category_id = $category_id";
+        }
+        
+        // Add city filter - need to join with addresses table
+        if (!empty($filters['city'])) {
+            $city = $db->escapeString($filters['city']);
+            return self::getAllWithAddressFilter("a.city = '$city'", $limit, $offset, $whereClauses, $joinCategory);
         }
         
         $whereClause = !empty($whereClauses) ? "WHERE " . implode(" AND ", $whereClauses) : "";
         $limitClause = $limit ? "LIMIT $offset, $limit" : "";
         
-        $result = $db->query("SELECT * FROM factories $whereClause ORDER BY date_added DESC $limitClause");
+        $joinClause = "";
+        if ($joinCategory) {
+            $joinClause = "JOIN factory_categories fc ON f.id = fc.factory_id";
+        }
+        
+        $result = $db->query("
+            SELECT DISTINCT f.* 
+            FROM factories f 
+            $joinClause
+            $whereClause 
+            ORDER BY f.date_added DESC 
+            $limitClause
+        ");
         
         $factories = [];
         while ($row = $db->fetchArray($result)) {
@@ -188,49 +220,74 @@ class Factory {
         $db = Database::getInstance();
         
         $whereClauses = [];
+        $joinCategory = false;
+        
+        // Add search filter for title and description
+        if (!empty($filters['search'])) {
+            $search = $db->escapeString($filters['search']);
+            $whereClauses[] = "(f.title LIKE '%$search%' OR f.description LIKE '%$search%')";
+        }
         
         if (!empty($filters['type'])) {
             $type = $db->escapeString($filters['type']);
-            $whereClauses[] = "type = '$type'";
+            $whereClauses[] = "f.type = '$type'";
         }
         
         if (!empty($filters['status'])) {
             $status = $db->escapeString($filters['status']);
-            $whereClauses[] = "status = '$status'";
+            $whereClauses[] = "f.status = '$status'";
         }
         
         if (!empty($filters['featured'])) {
-            $whereClauses[] = "featured = 1";
+            $whereClauses[] = "f.featured = 1";
         }
         
         if (!empty($filters['min_price'])) {
             $min_price = floatval($filters['min_price']);
-            $whereClauses[] = "price >= $min_price";
+            $whereClauses[] = "f.price >= $min_price";
         }
         
         if (!empty($filters['max_price'])) {
             $max_price = floatval($filters['max_price']);
-            $whereClauses[] = "price <= $max_price";
+            $whereClauses[] = "f.price <= $max_price";
         }
         
         if (!empty($filters['min_area'])) {
             $min_area = floatval($filters['min_area']);
-            $whereClauses[] = "area >= $min_area";
+            $whereClauses[] = "f.area >= $min_area";
         }
         
         if (!empty($filters['max_area'])) {
             $max_area = floatval($filters['max_area']);
-            $whereClauses[] = "area <= $max_area";
+            $whereClauses[] = "f.area <= $max_area";
         }
         
         if (!empty($filters['user_id'])) {
             $user_id = intval($filters['user_id']);
-            $whereClauses[] = "user_id = $user_id";
+            $whereClauses[] = "f.user_id = $user_id";
+        }
+        
+        // Add category filter
+        if (!empty($filters['category_id'])) {
+            $category_id = intval($filters['category_id']);
+            $joinCategory = true;
+            $whereClauses[] = "fc.category_id = $category_id";
         }
         
         $whereClause = !empty($whereClauses) ? "WHERE " . implode(" AND ", $whereClauses) : "";
         
-        $result = $db->query("SELECT COUNT(*) as total FROM factories $whereClause");
+        $joinClause = "";
+        if ($joinCategory) {
+            $joinClause = "JOIN factory_categories fc ON f.id = fc.factory_id";
+        }
+        
+        $result = $db->query("
+            SELECT COUNT(DISTINCT f.id) as total 
+            FROM factories f 
+            $joinClause
+            $whereClause
+        ");
+        
         $row = $db->fetchArray($result);
         return $row['total'];
     }
@@ -269,6 +326,18 @@ class Factory {
         return FactoryImage::getMainImageByFactoryId($this->id);
     }
     
+    // Get categories for this factory
+    public function getCategories() {
+        require_once __DIR__ . '/Category.php';
+        return Category::getCategoriesByFactoryId($this->id);
+    }
+    
+    // Set categories for this factory
+    public function setCategories($category_ids) {
+        require_once __DIR__ . '/Category.php';
+        return Category::setFactoryCategories($this->id, $category_ids);
+    }
+    
     // Set object properties from array
     private function setProperties($data) {
         $this->id = $data['id'] ?? null;
@@ -284,6 +353,45 @@ class Factory {
         $this->updated_at = $data['updated_at'] ?? null;
         $this->contact_info = $data['contact_info'] ?? null;
         $this->user_id = $data['user_id'] ?? null;
+    }
+
+    // Get all factories with address filter
+    public static function getAllWithAddressFilter($addressCondition, $limit = null, $offset = 0, $whereClauses = [], $joinCategory = false) {
+        $db = Database::getInstance();
+        
+        // Convert whereClause array to string
+        $factoryConditions = !empty($whereClauses) ? implode(" AND ", $whereClauses) : "1=1";
+        
+        $joinCategoryClause = "";
+        if ($joinCategory) {
+            $joinCategoryClause = "JOIN factory_categories fc ON f.id = fc.factory_id";
+        }
+        
+        // Create the query with JOIN to addresses table
+        $query = "
+            SELECT DISTINCT f.* 
+            FROM factories f 
+            JOIN addresses a ON f.address_id = a.id 
+            $joinCategoryClause
+            WHERE $factoryConditions AND $addressCondition 
+            ORDER BY f.date_added DESC
+        ";
+        
+        // Add LIMIT clause if needed
+        if ($limit) {
+            $query .= " LIMIT $offset, $limit";
+        }
+        
+        $result = $db->query($query);
+        
+        $factories = [];
+        while ($row = $db->fetchArray($result)) {
+            $factory = new self();
+            $factory->setProperties($row);
+            $factories[] = $factory;
+        }
+        
+        return $factories;
     }
 }
 ?>

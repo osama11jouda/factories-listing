@@ -267,4 +267,84 @@ document.addEventListener("DOMContentLoaded", function () {
       });
     });
   }
+
+  // Password strength meter for profile page
+  const newPasswordInput = document.getElementById("new_password");
+  if (newPasswordInput) {
+    newPasswordInput.addEventListener("input", function () {
+      const password = this.value;
+      let strength = 0;
+      let color = "#dc3545"; // Default: red/weak
+
+      if (password.length >= 8) strength += 25;
+      if (password.match(/[a-z]+/)) strength += 25;
+      if (password.match(/[A-Z]+/)) strength += 25;
+      if (password.match(/[0-9]+/) || password.match(/[^a-zA-Z0-9]+/))
+        strength += 25;
+
+      if (strength > 75) color = "#28a745"; // Strong: green
+      else if (strength > 50) color = "#ffc107"; // Medium: yellow
+      else if (strength > 25) color = "#fd7e14"; // Weak: orange
+
+      const strengthMeter = document.getElementById(
+        "password-strength-meter-fill"
+      );
+      if (strengthMeter) {
+        strengthMeter.style.width = strength + "%";
+        strengthMeter.style.backgroundColor = color;
+
+        const helpText = document.getElementById("passwordHelp");
+        if (helpText) {
+          if (strength <= 25)
+            helpText.innerHTML = "Weak password. Try adding more characters.";
+          else if (strength <= 50)
+            helpText.innerHTML =
+              "Fair password. Add uppercase letters or numbers.";
+          else if (strength <= 75)
+            helpText.innerHTML =
+              "Good password. Consider adding special characters.";
+          else helpText.innerHTML = "Strong password!";
+        }
+      }
+    });
+  }
+
+  /* Factory Details Page Functions */
+  function changeMainImage(imagePath, thumbnail) {
+    // Update main image
+    document.getElementById("mainImage").src = imagePath;
+
+    // Update active thumbnail
+    let thumbnails = document.querySelectorAll(".gallery-thumbnail");
+    thumbnails.forEach((item) => item.classList.remove("active"));
+    thumbnail.classList.add("active");
+  }
+
+  // Initialize factory map if available
+  const factoryMap = document.getElementById("factory-map");
+  if (factoryMap) {
+    // Wait for coordinates from PHP
+    const lat = parseFloat(factoryMap.getAttribute("data-lat"));
+    const lng = parseFloat(factoryMap.getAttribute("data-lng"));
+
+    if (!isNaN(lat) && !isNaN(lng)) {
+      // Create map instance
+      const map = L.map("factory-map").setView([lat, lng], 14);
+
+      // Add OpenStreetMap tile layer
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 19,
+        attribution: "© OpenStreetMap contributors",
+      }).addTo(map);
+
+      // Add marker for factory location
+      const factoryTitle = factoryMap.getAttribute("data-title");
+      L.marker([lat, lng]).addTo(map).bindPopup(factoryTitle).openPopup();
+
+      // Fix for map rendering issues - force a resize after the page loads
+      setTimeout(function () {
+        map.invalidateSize();
+      }, 100);
+    }
+  }
 });

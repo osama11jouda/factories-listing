@@ -8,27 +8,52 @@ require_once '../models/Category.php';
 // Initialize variables
 $success = false;
 $error = '';
+$factoryId = isset($_GET['id']) ? intval($_GET['id']) : 0;
+
+if (!$factoryId) {
+    // Redirect if no valid ID provided
+    header('Location: factories.php');
+    exit;
+}
+
+$factoryObj = new Factory();
+if (!$factoryObj->findById($factoryId)) {
+    // Redirect if factory not found
+    header('Location: factories.php');
+    exit;
+}
+
+// Get address information
+$address = $factoryObj->getAddress();
+if (!$address) {
+    $address = new Address();
+}
+
+// Initialize the factory array with current values
 $factory = [
-    'title' => '',
-    'description' => '',
-    'street_address' => '',
-    'city' => '',
-    'state_province' => '',
-    'postal_code' => '',
-    'country' => '',
-    'latitude' => '',
-    'longitude' => '',
-    'price' => '',
-    'area' => '',
-    'type' => 'sale',
-    'status' => 'available',
-    'featured' => 0,
-    'contact_info' => '',
-    'categories' => []
+    'title' => $factoryObj->getTitle(),
+    'description' => $factoryObj->getDescription(),
+    'street_address' => $address->getStreetAddress(),
+    'city' => $address->getCity(),
+    'state_province' => $address->getStateProvince(),
+    'postal_code' => $address->getPostalCode(),
+    'country' => $address->getCountry(),
+    'latitude' => $address->getLatitude(),
+    'longitude' => $address->getLongitude(),
+    'price' => $factoryObj->getPrice(),
+    'area' => $factoryObj->getArea(),
+    'type' => $factoryObj->getType(),
+    'status' => $factoryObj->getStatus(),
+    'featured' => $factoryObj->isFeatured(),
+    'contact_info' => $factoryObj->getContactInfo()
 ];
 
 // Get all categories for selection
 $allCategories = Category::getAll();
+$selectedCategories = $factoryObj->getCategories();
+$selectedCategoryIds = array_map(function($cat) {
+    return $cat->getId();
+}, $selectedCategories);
 
 // Process form submission
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
@@ -58,22 +83,19 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     } elseif ($factory['area'] <= 0) {
         $error = "Area must be greater than zero.";
     } else {
-        // Create address first
-        $address = new Address();
+        // Update address
         $address->setStreetAddress($factory['street_address']);
         $address->setCity($factory['city']);
         $address->setStateProvince($factory['state_province']);
         $address->setPostalCode($factory['postal_code']);
         $address->setCountry($factory['country']);
+        $address->setLatitude($factory['latitude']);
+        $address->setLongitude($factory['longitude']);
         
-        if ($address->create()) {
-            $addressId = $address->getId();
-            
-            // Create factory
-            $factoryObj = new Factory();
+        if ($address->update()) {
+            // Update factory
             $factoryObj->setTitle($factory['title']);
             $factoryObj->setDescription($factory['description']);
-            $factoryObj->setAddressId($addressId);
             $factoryObj->setPrice($factory['price']);
             $factoryObj->setArea($factory['area']);
             $factoryObj->setType($factory['type']);
@@ -81,13 +103,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             $factoryObj->setFeatured($factory['featured']);
             $factoryObj->setContactInfo($factory['contact_info']);
             $factoryObj->setCategories($factory['categories']);
-            // Set user_id if available (e.g. from session)
-            if (isset($_SESSION['user_id'])) {
-                $factoryObj->setUserId($_SESSION['user_id']);
-            }
             
-            if ($factoryObj->create()) {
-                $factoryId = $factoryObj->getId();
+            if ($factoryObj->update()) {
                 $success = true;
                 
                 // Handle image uploads
@@ -120,39 +137,46 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     }
                 }
                 
-                // Reset form after successful submission
-                $factory = [
-                    'title' => '',
-                    'description' => '',
-                    'street_address' => '',
-                    'city' => '',
-                    'state_province' => '',
-                    'postal_code' => '',
-                    'country' => '',
-                    'latitude' => '',
-                    'longitude' => '',
-                    'price' => '',
-                    'area' => '',
-                    'type' => 'sale',
-                    'status' => 'available',
-                    'featured' => 0,
-                    'contact_info' => '',
-                    'categories' => []
-                ];
+                // Set new main image if selected
+                if (isset($_POST['existing_main_image'])) {
+                    $mainImageId = intval($_POST['existing_main_image']);
+                    FactoryImage::updateMainImage($factoryId, $mainImageId);
+                }
+                
+                // Handle image deletions
+                if (isset($_POST['delete_images']) && is_array($_POST['delete_images'])) {
+                    foreach ($_POST['delete_images'] as $imageId) {
+                        $imageId = intval($imageId);
+                        $image = new FactoryImage();
+                        if ($image->findById($imageId)) {
+                            // Delete physical file
+                            if (file_exists('../uploads/factories/' . $image->getImagePath())) {
+                                unlink('../uploads/factories/' . $image->getImagePath());
+                            }
+                            // Delete database record
+                            $image->delete();
+                        }
+                    }
+                }
             } else {
-                $error = "Error: Failed to create factory.";
-                // Delete address since factory creation failed
-                $address->delete();
+                $error = "Error: Failed to update factory.";
             }
         } else {
-            $error = "Error: Failed to create address.";
+            $error = "Error: Failed to update address.";
         }
     }
+    
+    // Refresh factory data after update
+    $factoryObj->findById($factoryId);
+    $address = $factoryObj->getAddress();
 }
+
+// Get all factory images
+$factoryImages = FactoryImage::getByFactoryId($factoryId);
 ?>
 
 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-    <h1 class="h2">Add New Factory</h1>
+    <h1 class="h2">Edit Factory</h1>
     <div class="btn-toolbar mb-2 mb-md-0">
         <div class="btn-group mr-2">
             <a href="factories.php" class="btn btn-sm btn-outline-secondary">
@@ -164,7 +188,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
 <?php if ($success): ?>
     <div class="alert alert-success alert-dismissible fade show" role="alert">
-        <strong>Success!</strong> Factory has been added successfully.
+        <strong>Success!</strong> Factory has been updated successfully.
         <button type="button" class="close" data-dismiss="alert" aria-label="Close">
             <span aria-hidden="true">&times;</span>
         </button>
@@ -182,7 +206,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
 <div class="card">
     <div class="card-body">
-        <form method="post" action="<?php echo htmlspecialchars($_SERVER["PHP_SELF"]); ?>" enctype="multipart/form-data">
+        <form method="post" action="<?php echo htmlspecialchars($_SERVER["PHP_SELF"] . "?id=" . $factoryId); ?>" enctype="multipart/form-data">
             <div class="row">
                 <div class="col-md-8">
                     <div class="form-group">
@@ -228,13 +252,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     <div class="form-group">
                         <label for="map">Factory Location on Map <span class="text-danger">*</span></label>
                         <p class="text-muted small">Click on the map to set the factory location</p>
-                        <div id="map"></div>
+                        <div id="map" style="height: 400px;"></div>
                         <div class="form-row mt-2">
                             <div class="col-md-6">
-                                <input type="text" class="form-control" id="latitude" name="latitude" placeholder="Latitude" readonly value="<?php echo htmlspecialchars($factory['latitude'] ?? ''); ?>" required>
+                                <input type="text" class="form-control" id="latitude" name="latitude" placeholder="Latitude" value="<?php echo htmlspecialchars($factory['latitude'] ?? ''); ?>" required>
                             </div>
                             <div class="col-md-6">
-                                <input type="text" class="form-control" id="longitude" name="longitude" placeholder="Longitude" readonly value="<?php echo htmlspecialchars($factory['longitude'] ?? ''); ?>" required>
+                                <input type="text" class="form-control" id="longitude" name="longitude" placeholder="Longitude" value="<?php echo htmlspecialchars($factory['longitude'] ?? ''); ?>" required>
                             </div>
                         </div>
                         <div class="form-row mt-2">
@@ -264,13 +288,40 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                         <small class="form-text text-muted">Optional: Add specific contact info for this factory if different from company contact.</small>
                     </div>
                     
+                    <!-- Existing Images -->
+                    <?php if (count($factoryImages) > 0): ?>
                     <div class="form-group">
-                        <label>Factory Images</label>
+                        <label>Existing Images</label>
+                        <div class="row">
+                            <?php foreach ($factoryImages as $image): ?>
+                            <div class="col-md-3 mb-3">
+                                <div class="card">
+                                    <img src="../uploads/factories/<?php echo $image->getImagePath(); ?>" class="card-img-top" alt="Factory Image" style="height: 150px; object-fit: cover;">
+                                    <div class="card-body p-2 text-center">
+                                        <div class="custom-control custom-radio mb-2">
+                                            <input type="radio" id="existing_main_image_<?php echo $image->getId(); ?>" name="existing_main_image" value="<?php echo $image->getId(); ?>" class="custom-control-input" <?php echo $image->isMain() ? 'checked' : ''; ?>>
+                                            <label class="custom-control-label" for="existing_main_image_<?php echo $image->getId(); ?>">Main Image</label>
+                                        </div>
+                                        <div class="custom-control custom-checkbox">
+                                            <input type="checkbox" id="delete_image_<?php echo $image->getId(); ?>" name="delete_images[]" value="<?php echo $image->getId(); ?>" class="custom-control-input">
+                                            <label class="custom-control-label" for="delete_image_<?php echo $image->getId(); ?>">Delete</label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
+                    <?php endif; ?>
+                    
+                    <!-- Add New Images -->
+                    <div class="form-group">
+                        <label>Add New Images</label>
                         <div class="custom-file mb-3">
                             <input type="file" class="custom-file-input" id="images" name="images[]" multiple accept="image/*">
                             <label class="custom-file-label" for="images">Choose files...</label>
                         </div>
-                        <small class="form-text text-muted">You can select multiple images. The first image will be used as the main image.</small>
+                        <small class="form-text text-muted">You can select multiple new images to add.</small>
                         
                         <div id="imagePreview" class="row mt-3"></div>
                     </div>
@@ -309,7 +360,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                                 <label for="categories">Categories</label>
                                 <select class="form-control" id="categories" name="categories[]" multiple>
                                     <?php foreach ($allCategories as $category): ?>
-                                        <option value="<?php echo $category->getId(); ?>" <?php echo in_array($category->getId(), $factory['categories']) ? 'selected' : ''; ?>>
+                                        <option value="<?php echo $category->getId(); ?>" <?php echo in_array($category->getId(), $selectedCategoryIds) ? 'selected' : ''; ?>>
                                             <?php echo htmlspecialchars($category->getName()); ?>
                                         </option>
                                     <?php endforeach; ?>
@@ -321,7 +372,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                             
                             <div class="form-group text-right mb-0">
                                 <button type="submit" class="btn btn-primary">
-                                    <i class="fas fa-save"></i> Save Factory
+                                    <i class="fas fa-save"></i> Update Factory
                                 </button>
                             </div>
                         </div>
@@ -353,8 +404,8 @@ document.getElementById('images').addEventListener('change', function(event) {
                             <img src="${e.target.result}" class="card-img-top" alt="Factory Image" style="height: 150px; object-fit: cover;">
                             <div class="card-body p-2 text-center">
                                 <div class="custom-control custom-radio">
-                                    <input type="radio" id="main_image_${i}" name="main_image" value="${i}" class="custom-control-input" ${i === 0 ? 'checked' : ''}>
-                                    <label class="custom-control-label" for="main_image_${i}">Main Image</label>
+                                    <input type="radio" id="main_image_${i}" name="main_image" value="${i}" class="custom-control-input">
+                                    <label class="custom-control-label" for="main_image_${i}">Make Main</label>
                                 </div>
                             </div>
                         </div>
@@ -445,7 +496,7 @@ document.getElementById('search-location').addEventListener('click', function() 
         });
 });
 
-// Handle pre-filled coordinates (e.g. when editing existing factory)
+// Handle pre-filled coordinates
 window.addEventListener('load', function() {
     // Fix for map rendering issues - force a resize after the page loads
     setTimeout(function() {

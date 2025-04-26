@@ -20,6 +20,11 @@ class FactoryImage {
     public function isMain() { return $this->is_main; }
     public function getUploadDate() { return $this->upload_date; }
     
+    // Get the full image path including the uploads directory
+    public function getFullImagePath() { 
+        return '/uploads/factories/' . $this->image_path; 
+    }
+    
     // Setters
     public function setFactoryId($factory_id) { $this->factory_id = $factory_id; }
     public function setImagePath($image_path) { $this->image_path = $image_path; }
@@ -138,6 +143,19 @@ class FactoryImage {
         }
         
         return null;
+    }
+    
+    // Update main image for a factory
+    public static function updateMainImage($factory_id, $image_id) {
+        $db = Database::getInstance();
+        $factory_id = intval($factory_id);
+        $image_id = intval($image_id);
+        
+        // First, unset all main images for this factory
+        $db->query("UPDATE factory_images SET is_main = 0 WHERE factory_id = $factory_id");
+        
+        // Then set the selected image as main
+        return $db->query("UPDATE factory_images SET is_main = 1 WHERE id = $image_id AND factory_id = $factory_id");
     }
     
     // Set object properties from array

@@ -1,4 +1,10 @@
-<?php include 'includes/header.php'; ?>
+<?php 
+// Start output buffering to prevent "headers already sent" errors
+ob_start();
+include 'includes/header.php'; 
+?>
+<?php require_once '../models/User.php'; ?>
+<?php require_once '../models/Membership.php'; ?>
 
 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
     <h1 class="h2">User Management</h1>
@@ -8,70 +14,99 @@
 // Handle user activation/deactivation
 if (isset($_GET['activate']) && is_numeric($_GET['activate'])) {
     $userId = intval($_GET['activate']);
-    $value = isset($_GET['value']) && $_GET['value'] == '1' ? 1 : 0;
+    $value = isset($_GET['value']) && $_GET['value'] == '1' ? true : false;
     
-    $query = "UPDATE users SET is_active = $value WHERE id = $userId AND is_admin = 0";
-    if (mysqli_query($conn, $query)) {
-        echo '<div class="alert alert-success alert-dismissible fade show" role="alert">
-                User status updated successfully.
-                <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-                    <span aria-hidden="true">&times;</span>
-                </button>
-            </div>';
-    } else {
-        echo '<div class="alert alert-danger alert-dismissible fade show" role="alert">
-                Error updating user: ' . mysqli_error($conn) . '
-                <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-                    <span aria-hidden="true">&times;</span>
-                </button>
-            </div>';
+    $user = new User();
+    if ($user->findById($userId) && !$user->isAdmin()) {
+        $user->setIsActive($value);
+        
+        if ($user->update()) {
+            // Use JavaScript to reload the page instead of PHP header()
+            echo '<div class="alert alert-success alert-dismissible fade show" role="alert">
+                    User status updated successfully.
+                    <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>';
+        } else {
+            echo '<div class="alert alert-danger alert-dismissible fade show" role="alert">
+                    Error updating user status. Please try again.
+                    <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>';
+        }
     }
+}
+
+// Display success message after activation/deactivation
+if (isset($_GET['activation_success'])) {
+    echo '<div class="alert alert-success alert-dismissible fade show" role="alert">
+            User status updated successfully.
+            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                <span aria-hidden="true">&times;</span>
+            </button>
+        </div>';
 }
 
 // Handle user deletion
 if (isset($_GET['delete']) && is_numeric($_GET['delete'])) {
     $userId = intval($_GET['delete']);
     
-    $query = "DELETE FROM users WHERE id = $userId AND is_admin = 0";
-    if (mysqli_query($conn, $query)) {
-        echo '<div class="alert alert-success alert-dismissible fade show" role="alert">
-                User deleted successfully.
-                <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-                    <span aria-hidden="true">&times;</span>
-                </button>
-            </div>';
-    } else {
-        echo '<div class="alert alert-danger alert-dismissible fade show" role="alert">
-                Error deleting user: ' . mysqli_error($conn) . '
-                <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-                    <span aria-hidden="true">&times;</span>
-                </button>
-            </div>';
+    $user = new User();
+    if ($user->findById($userId) && !$user->isAdmin()) {
+        if ($user->delete()) {
+            echo '<div class="alert alert-success alert-dismissible fade show" role="alert">
+                    User deleted successfully.
+                    <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>';
+        } else {
+            echo '<div class="alert alert-danger alert-dismissible fade show" role="alert">
+                    Error deleting user.
+                    <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>';
+        }
     }
 }
 
 // Update subscription expiry
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_subscription'])) {
     $userId = intval($_POST['user_id']);
-    $expiryDate = mysqli_real_escape_string($conn, $_POST['subscription_expiry']);
+    $expiryDate = $_POST['subscription_expiry'];
+    $membershipId = isset($_POST['membership_id']) ? intval($_POST['membership_id']) : null;
     
-    $query = "UPDATE users SET subscription_expiry = '$expiryDate', is_active = 1 WHERE id = $userId";
-    if (mysqli_query($conn, $query)) {
-        echo '<div class="alert alert-success alert-dismissible fade show" role="alert">
-                Subscription updated successfully.
-                <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-                    <span aria-hidden="true">&times;</span>
-                </button>
-            </div>';
-    } else {
-        echo '<div class="alert alert-danger alert-dismissible fade show" role="alert">
-                Error updating subscription: ' . mysqli_error($conn) . '
-                <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-                    <span aria-hidden="true">&times;</span>
-                </button>
-            </div>';
+    $user = new User();
+    if ($user->findById($userId)) {
+        $user->setSubscriptionExpiry($expiryDate);
+        $user->setIsActive(true);
+        if ($membershipId) {
+            $user->setMembershipId($membershipId);
+        }
+        
+        if ($user->update()) {
+            echo '<div class="alert alert-success alert-dismissible fade show" role="alert">
+                    Subscription updated successfully.
+                    <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>';
+        } else {
+            echo '<div class="alert alert-danger alert-dismissible fade show" role="alert">
+                    Error updating subscription.
+                    <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>';
+        }
     }
 }
+
+// Get all membership plans for dropdown
+$membershipPlans = Membership::getAll();
 
 // Pagination parameters
 $page = isset($_GET['page']) ? intval($_GET['page']) : 1;
@@ -79,8 +114,8 @@ $itemsPerPage = 10;
 $offset = ($page - 1) * $itemsPerPage;
 
 // Search parameters
-$search = isset($_GET['search']) ? mysqli_real_escape_string($conn, $_GET['search']) : '';
-$statusFilter = isset($_GET['status']) ? mysqli_real_escape_string($conn, $_GET['status']) : '';
+$search = isset($_GET['search']) ? $_GET['search'] : '';
+$statusFilter = isset($_GET['status']) ? $_GET['status'] : '';
 
 // Build the search condition
 $searchCondition = "WHERE is_admin = 0";
@@ -92,14 +127,23 @@ if ($statusFilter !== '') {
 }
 
 // Get total number of users with search condition
+$db = Database::getInstance();
 $countQuery = "SELECT COUNT(*) as total FROM users $searchCondition";
-$countResult = mysqli_query($conn, $countQuery);
-$totalItems = mysqli_fetch_assoc($countResult)['total'];
+$countResult = $db->query($countQuery);
+$totalItems = $db->fetchArray($countResult)['total'];
 $totalPages = ceil($totalItems / $itemsPerPage);
 
 // Get users with search condition and pagination
 $query = "SELECT * FROM users $searchCondition ORDER BY registration_date DESC LIMIT $offset, $itemsPerPage";
-$result = mysqli_query($conn, $query);
+$result = $db->query($query);
+
+// We need to create User objects from the results
+$users = [];
+while ($userData = $db->fetchArray($result)) {
+    $user = new User();
+    $user->findById($userData['id']);
+    $users[] = $user;
+}
 ?>
 
 <!-- Search Form -->
@@ -145,57 +189,71 @@ $result = mysqli_query($conn, $query);
                 </thead>
                 <tbody>
                     <?php 
-                    if (mysqli_num_rows($result) > 0): 
-                        while ($user = mysqli_fetch_assoc($result)):
+                    if (count($users) > 0): 
+                        foreach ($users as $user):
                     ?>
                         <tr>
-                            <td><?php echo htmlspecialchars($user['name']); ?></td>
-                            <td><?php echo htmlspecialchars($user['email']); ?></td>
-                            <td><?php echo htmlspecialchars($user['company'] ?: 'N/A'); ?></td>
-                            <td><?php echo htmlspecialchars($user['phone'] ?: 'N/A'); ?></td>
-                            <td><?php echo date('M d, Y', strtotime($user['registration_date'])); ?></td>
+                            <td><?php echo htmlspecialchars($user->getName()); ?></td>
+                            <td><?php echo htmlspecialchars($user->getEmail()); ?></td>
+                            <td><?php echo htmlspecialchars($user->getCompany() ?: 'N/A'); ?></td>
+                            <td><?php echo htmlspecialchars($user->getPhone() ?: 'N/A'); ?></td>
+                            <td><?php echo date('M d, Y', strtotime($user->getRegistrationDate())); ?></td>
                             <td>
-                                <?php if ($user['is_active']): ?>
+                                <?php if ($user->isActive()): ?>
                                     <span class="badge badge-success">Active</span>
                                 <?php else: ?>
                                     <span class="badge badge-secondary">Inactive</span>
                                 <?php endif; ?>
                             </td>
                             <td>
-                                <?php if (!empty($user['subscription_expiry'])): ?>
-                                    <?php 
-                                    $expiryDate = strtotime($user['subscription_expiry']);
+                                <?php 
+                                // Display membership plan name if available
+                                $membershipName = "No Plan";
+                                if ($user->getMembershipId()) {
+                                    foreach ($membershipPlans as $plan) {
+                                        if ($plan->getId() == $user->getMembershipId()) {
+                                            $membershipName = $plan->getName();
+                                            break;
+                                        }
+                                    }
+                                }
+                                
+                                if ($user->getSubscriptionExpiry()): 
+                                    $expiryDate = strtotime($user->getSubscriptionExpiry());
                                     $today = time();
                                     $status = ($expiryDate < $today) ? 'danger' : 'success';
-                                    ?>
-                                    <span class="badge badge-<?php echo $status; ?>">
-                                        Expires: <?php echo date('M d, Y', $expiryDate); ?>
-                                    </span>
+                                ?>
+                                    <div>
+                                        <span class="badge badge-<?php echo $status; ?>">
+                                            Expires: <?php echo date('M d, Y', $expiryDate); ?>
+                                        </span>
+                                    </div>
+                                    <small class="text-muted"><?php echo htmlspecialchars($membershipName); ?></small>
                                 <?php else: ?>
                                     <span class="badge badge-warning">No Subscription</span>
                                 <?php endif; ?>
                             </td>
                             <td>
                                 <div class="btn-group btn-group-sm">
-                                    <button type="button" class="btn btn-info" data-toggle="modal" data-target="#subscriptionModal<?php echo $user['id']; ?>">
+                                    <button type="button" class="btn btn-info" data-toggle="modal" data-target="#subscriptionModal<?php echo $user->getId(); ?>">
                                         <i class="fas fa-credit-card"></i>
                                     </button>
-                                    <?php if ($user['is_active']): ?>
-                                        <a href="users.php?activate=<?php echo $user['id']; ?>&value=0" class="btn btn-warning" title="Deactivate">
+                                    <?php if ($user->isActive()): ?>
+                                        <a href="users.php?activate=<?php echo $user->getId(); ?>&value=0" class="btn btn-warning" title="Deactivate">
                                             <i class="fas fa-user-slash"></i>
                                         </a>
                                     <?php else: ?>
-                                        <a href="users.php?activate=<?php echo $user['id']; ?>&value=1" class="btn btn-success" title="Activate">
+                                        <a href="users.php?activate=<?php echo $user->getId(); ?>&value=1" class="btn btn-success" title="Activate">
                                             <i class="fas fa-user-check"></i>
                                         </a>
                                     <?php endif; ?>
-                                    <a href="users.php?delete=<?php echo $user['id']; ?>" class="btn btn-danger" title="Delete" onclick="return confirm('Are you sure you want to delete this user?')">
+                                    <a href="users.php?delete=<?php echo $user->getId(); ?>" class="btn btn-danger" title="Delete" onclick="return confirm('Are you sure you want to delete this user?')">
                                         <i class="fas fa-trash-alt"></i>
                                     </a>
                                 </div>
                                 
                                 <!-- Subscription Modal -->
-                                <div class="modal fade" id="subscriptionModal<?php echo $user['id']; ?>" tabindex="-1" aria-labelledby="subscriptionModalLabel" aria-hidden="true">
+                                <div class="modal fade" id="subscriptionModal<?php echo $user->getId(); ?>" tabindex="-1" aria-labelledby="subscriptionModalLabel" aria-hidden="true">
                                     <div class="modal-dialog">
                                         <div class="modal-content">
                                             <div class="modal-header">
@@ -206,10 +264,21 @@ $result = mysqli_query($conn, $query);
                                             </div>
                                             <form method="post" action="<?php echo htmlspecialchars($_SERVER['PHP_SELF']); ?>">
                                                 <div class="modal-body">
-                                                    <input type="hidden" name="user_id" value="<?php echo $user['id']; ?>">
+                                                    <input type="hidden" name="user_id" value="<?php echo $user->getId(); ?>">
                                                     <div class="form-group">
                                                         <label for="subscription_expiry">Subscription Expiry Date</label>
-                                                        <input type="date" class="form-control" id="subscription_expiry" name="subscription_expiry" value="<?php echo !empty($user['subscription_expiry']) ? $user['subscription_expiry'] : date('Y-m-d', strtotime('+1 month')); ?>" required>
+                                                        <input type="date" class="form-control" id="subscription_expiry" name="subscription_expiry" value="<?php echo !empty($user->getSubscriptionExpiry()) ? $user->getSubscriptionExpiry() : date('Y-m-d', strtotime('+1 month')); ?>" required>
+                                                    </div>
+                                                    <div class="form-group">
+                                                        <label for="membership_id">Membership Plan</label>
+                                                        <select class="form-control" id="membership_id" name="membership_id">
+                                                            <option value="">Select Plan</option>
+                                                            <?php foreach ($membershipPlans as $plan): ?>
+                                                                <option value="<?php echo $plan->getId(); ?>" <?php echo $user->getMembershipId() == $plan->getId() ? 'selected' : ''; ?>>
+                                                                    <?php echo htmlspecialchars($plan->getName()); ?> ($<?php echo number_format($plan->getPrice(), 2); ?> / <?php echo $plan->getDurationMonths(); ?> months)
+                                                                </option>
+                                                            <?php endforeach; ?>
+                                                        </select>
                                                     </div>
                                                 </div>
                                                 <div class="modal-footer">
@@ -223,7 +292,7 @@ $result = mysqli_query($conn, $query);
                             </td>
                         </tr>
                     <?php 
-                        endwhile;
+                        endforeach;
                     else: 
                     ?>
                         <tr>

@@ -1,13 +1,13 @@
 <?php
 
 // Database connection parameters
-$db_host = "localhost";
-$db_user = "root";
-$db_password = "";
-$db_name = "factories_listing";
+define('DB_HOST', 'localhost');
+define('DB_USER', 'root');
+define('DB_PASS', '');
+define('DB_NAME', 'factories_listing');
 
 // Create database connection
-$conn = mysqli_connect($db_host, $db_user, $db_password, $db_name);
+$conn = mysqli_connect(DB_HOST, DB_USER, DB_PASS, DB_NAME);
 
 // Check connection
 if (!$conn) {

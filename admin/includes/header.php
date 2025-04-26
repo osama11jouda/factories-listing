@@ -19,6 +19,9 @@ include_once '../includes/config.php';
     <title>Admin Panel - Syrian Factories</title>
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.1/css/all.min.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+          integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+          crossorigin=""/>
     <style>
         body {
             padding-top: 56px;
@@ -56,6 +59,15 @@ include_once '../includes/config.php';
         }
         .table th {
             background-color: #f8f9fa;
+        }
+        
+        /* Map styling */
+        #map {
+            height: 400px;
+            width: 100%;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-bottom: 15px;
         }
     </style>
 </head>
@@ -110,6 +122,9 @@ include_once '../includes/config.php';
                     </a>
                     <a href="users.php" class="list-group-item list-group-item-action <?php echo basename($_SERVER['PHP_SELF']) == 'users.php' ? 'active' : ''; ?>">
                         <i class="fas fa-users"></i> Users
+                    </a>
+                    <a href="categories.php" class="list-group-item list-group-item-action <?php echo basename($_SERVER['PHP_SELF']) == 'categories.php' ? 'active' : ''; ?>">
+                        <i class="fas fa-tags"></i> Categories
                     </a>
                     <a href="subscriptions.php" class="list-group-item list-group-item-action <?php echo basename($_SERVER['PHP_SELF']) == 'subscriptions.php' ? 'active' : ''; ?>">
                         <i class="fas fa-credit-card"></i> Subscriptions

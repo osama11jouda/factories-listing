@@ -125,7 +125,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                             <textarea class="form-control" id="message" name="message" rows="5" required><?php echo htmlspecialchars($message); ?></textarea>
                         </div>
                         
-                        <button type="submit" class="btn btn-success btn-lg btn-block" style="background-color: #28a745; border-color: #28a745;">
+                        <button type="submit" class="btn btn-success btn-lg btn-block">
                             <i class="fas fa-paper-plane"></i> Send Message
                         </button>
                     </form>
@@ -147,32 +147,5 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         </div>
     </div>
 </div>
-
-<style>
-.contact-info-item {
-    padding: 15px;
-    transition: transform 0.3s ease-in-out;
-}
-
-.contact-info-item:hover {
-    transform: translateY(-5px);
-}
-
-.contact-icon {
-    font-size: 2.5rem;
-    color:rgb(32, 179, 96);
-    margin-bottom: 15px;
-}
-
-.contact-info-item h5 {
-    font-weight: 600;
-    margin-bottom: 10px;
-}
-
-.contact-info-item p {
-    color: #6c757d;
-    margin-bottom: 0;
-}
-</style>
 
 <?php include 'includes/footer.php'; ?>

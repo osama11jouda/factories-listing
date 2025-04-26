@@ -99,7 +99,7 @@ class User {
         $email = $this->db->escapeString($this->email);
         $phone = $this->db->escapeString($this->phone);
         $company = $this->db->escapeString($this->company);
-        $is_active = $this->is_active ? 1 : 0;
+        $is_active = $this->is_active ? 1 : 0; // Ensure boolean is correctly converted to integer
         $subscription_expiry = $this->subscription_expiry ? "'{$this->db->escapeString($this->subscription_expiry)}'" : 'NULL';
         $membership_id = $this->membership_id ? $this->membership_id : 'NULL';
         
@@ -113,7 +113,14 @@ class User {
                     membership_id = $membership_id 
                 WHERE id = {$this->id}";
         
-        return $this->db->query($sql);
+        $result = $this->db->query($sql);
+        
+        // Debug code to help trace any issues
+        if (!$result) {
+            error_log("User update failed. SQL: $sql");
+        }
+        
+        return $result;
     }
     
     // Update password
