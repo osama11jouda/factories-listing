@@ -1,6 +1,13 @@
-# Assets folder
-assests/
-uploads/
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# IDE files
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
 
 # OS generated files
 .DS_Store
@@ -11,21 +18,11 @@ uploads/
 ehthumbs.db
 Thumbs.db
 
-# IDE files
-.idea/
-.vscode/
+# User uploaded content that shouldn't be in version control
+/uploads/*
+!/uploads/factories/
+/uploads/factories/*
+!/uploads/factories/.gitkeep
 
-# Configuration files that might contain sensitive information
-includes/config.php
-
-# Logs and databases
+# Logs
 *.log
-*.sql
-*.sqlite
-
-# Cache files
-*.cache
-
-# Dependency directories
-vendor/
-node_modules/

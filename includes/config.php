@@ -1,10 +1,14 @@
 <?php
+require_once __DIR__ . '/../models/EnvLoader.php';
+
+// Load environment variables
+EnvLoader::init();
 
 // Database connection parameters
-define('DB_HOST', 'localhost');
-define('DB_USER', 'root');
-define('DB_PASS', '');
-define('DB_NAME', 'factories_listing');
+define('DB_HOST', EnvLoader::get('DB_HOST', 'localhost'));
+define('DB_USER', EnvLoader::get('DB_USER', 'root'));
+define('DB_PASS', EnvLoader::get('DB_PASS', ''));
+define('DB_NAME', EnvLoader::get('DB_NAME', 'factories_listing'));
 
 // Create database connection
 $conn = mysqli_connect(DB_HOST, DB_USER, DB_PASS, DB_NAME);
@@ -16,6 +20,19 @@ if (!$conn) {
 
 // Set charset to UTF-8
 mysqli_set_charset($conn, "utf8");
+
+// Site configuration constants
+define('SITE_URL', EnvLoader::get('SITE_URL', 'http://localhost/FactoriesListing'));
+define('SITE_NAME', EnvLoader::get('SITE_NAME', 'Syrian Factories Listing'));
+define('ADMIN_EMAIL', EnvLoader::get('ADMIN_EMAIL', 'admin@example.com'));
+
+// Upload configuration
+define('UPLOAD_MAX_SIZE', EnvLoader::get('UPLOAD_MAX_SIZE', 5242880)); // 5MB default
+define('ALLOWED_EXTENSIONS', EnvLoader::get('ALLOWED_EXTENSIONS', 'jpg,jpeg,png,webp,gif'));
+
+// Subscription configuration
+define('SUBSCRIPTION_ENABLED', EnvLoader::get('SUBSCRIPTION_ENABLED', true));
+define('TRIAL_DAYS', EnvLoader::get('TRIAL_DAYS', 0));
 
 // Function to check if user is logged in
 function isLoggedIn() {
