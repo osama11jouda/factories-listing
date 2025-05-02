@@ -1,0 +1,20 @@
+User-agent: *
+Allow: /
+Allow: /index.php
+Allow: /factories.php
+Allow: /factory-details.php
+Allow: /about.php
+Allow: /contact.php
+Allow: /register.php
+Allow: /css/
+Allow: /js/
+Allow: /assests/images/
+Allow: /uploads/factories/
+
+# Disallow admin areas
+Disallow: /admin/
+Disallow: /logout.php
+Disallow: /profile.php
+
+# Sitemap location
+Sitemap: https://example.com/sitemap.xml

@@ -4,12 +4,54 @@ session_start();
 if (!function_exists('isLoggedIn')) {
     include_once 'config.php';
 }
+
+// Get current page for meta description
+$current_page = basename($_SERVER['PHP_SELF'], '.php');
+$meta_description = '';
+$meta_keywords = 'factories, industrial listing, manufacturing, industry directory';
+
+switch ($current_page) {
+    case 'index':
+        $meta_description = 'Find and connect with manufacturing factories worldwide. The leading platform for industrial connections and factory listings.';
+        break;
+    case 'factories':
+        $meta_description = 'Browse our comprehensive directory of factories and manufacturing facilities across various industries.';
+        break;
+    case 'factory-details':
+        $meta_description = 'Detailed information about manufacturing facilities, capabilities, and contact details.';
+        break;
+    case 'about':
+        $meta_description = 'Learn more about Factories Listing, the premier platform connecting businesses with manufacturing facilities.';
+        break;
+    case 'contact':
+        $meta_description = 'Contact Factories Listing for inquiries, support, or to list your manufacturing facility.';
+        break;
+    case 'register':
+        $meta_description = 'Register your business or factory on our platform to gain visibility and connect with potential clients.';
+        break;
+    case 'profile':
+        $meta_description = 'Manage your Factories Listing profile and subscription details.';
+        break;
+    default:
+        $meta_description = 'Factories Listing - Your Gateway to Industrial Connections. Find and connect with manufacturing facilities worldwide.';
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="<?php echo htmlspecialchars($meta_description); ?>">
+    <meta name="keywords" content="<?php echo htmlspecialchars($meta_keywords); ?>">
+    <meta name="robots" content="index, follow">
+    <meta name="author" content="Factories Listing">
+    <meta property="og:title" content="<?php echo htmlspecialchars(ucfirst($current_page) . ' - Factories Listing'); ?>">
+    <meta property="og:description" content="<?php echo htmlspecialchars($meta_description); ?>">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="<?php echo htmlspecialchars('https://' . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI']); ?>">
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="<?php echo htmlspecialchars(ucfirst($current_page) . ' - Factories Listing'); ?>">
+    <meta name="twitter:description" content="<?php echo htmlspecialchars($meta_description); ?>">
     <title>Factories Listing - Your Gateway to Industrial Connections</title>
     <!-- Bootstrap CSS -->
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
